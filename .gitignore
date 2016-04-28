@@ -1,0 +1,9 @@
+CfiDriver/bin/
+CfiDriver/obj/
+CfiVerifier/bin/
+CfiVerifier/obj/
+split*.bpl
+intermediate*.bpl
+*.*~
+*.suo
+*.swp
