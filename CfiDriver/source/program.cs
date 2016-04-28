@@ -94,7 +94,7 @@ namespace CfiDriver
                       string boogie_args = @" " + benchmark.Item1 + delim + @"split_" + i.ToString() + @"." + 
                           benchmark.Item4 + ".bpl /timeLimit:" + Options.timeoutPerProcess + 
                           @" /contractInfer /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0";
-                      string boogie_bin = @"." + delim + "boogie" + delim + "Binaries" + delim + "Boogie.exe";
+                      string boogie_bin = @"." + delim + "references" + delim + "Boogie.exe";
                       output.WriteLine(boogie_bin + boogie_args);
                   }
                   output.Flush();
@@ -202,7 +202,7 @@ namespace CfiDriver
         private static Tuple<BoogieResult, int> ExecuteBoogieBinary(string arguments)
         {
           var delim = Options.IsLinux() ? @"/" : @"\";
-          string binaryName = @"." + delim + "boogie" + delim + "Binaries" + delim + "Boogie.exe";
+          string binaryName = @"." + delim + "references" + delim + "Boogie.exe";
           //Func<string, string> ProcessOutput = delegate(string s) { return ("The number of lines in output = " + s.Split('\n').Count().ToString()); };
           Func<string, BoogieResult> result = delegate(string s)
           {

@@ -2065,7 +2065,7 @@ namespace CfiVerifier
           private static bool ExecuteBoogieBinary(string arguments)
           {
               var delim = Options.IsLinux() ? @"/" : @"\";
-              string binaryName = @"." + delim + "boogie" + delim + "Binaries" + delim + "Boogie.exe";
+              string binaryName = @"." + delim + "references" + delim + "Boogie.exe";
               //Func<string, string> ProcessOutput = delegate(string s) { return ("The number of lines in output = " + s.Split('\n').Count().ToString()); };
               Func<string, bool> result = delegate(string s)
               {
