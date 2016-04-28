@@ -8,4 +8,4 @@ verifier for the Information Release Confinement property
 Please follow the steps in references/README
 
 # Usage
-CfiDriver/bin/Debug/CfiDriver.exe <benchmark_name>
+CfiDriver/bin/Debug/CfiDriver.exe benchmark_name
