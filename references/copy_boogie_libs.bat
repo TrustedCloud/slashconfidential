@@ -25,10 +25,10 @@ copy %1\BoogieVCExpr.pdb .
 copy %1\BoogieVCGeneration.dll .
 copy %1\BoogieVCGeneration.pdb .
 REM ------ other boogie files
-REM copy %1\boogie.exe .
-REM copy %1\boogie.pdb .
-REM copy %1\BVD.exe .
-REM copy %1\BVD.pdb .
+copy %1\Boogie.exe .
+copy %1\Boogie.pdb .
+copy %1\BVD.exe .
+copy %1\BVD.pdb .
 REM copy %1\BoogieDoomed.dll .
 REM copy %1\BoogieDoomed.pdb .
 REM copy %1\BoogiePredication.dll .
