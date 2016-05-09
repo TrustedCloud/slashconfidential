@@ -169,7 +169,7 @@ namespace z3flagoptimizer
             return true;
         }
 
-        static bool debugOutput = true;
+        static bool debugOutput = false;
         static List<Process> SpawnedProcesses = new List<Process>();
 
         static List<string> RunShell(string dir, string cmd, string args)
