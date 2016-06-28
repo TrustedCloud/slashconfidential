@@ -1872,13 +1872,16 @@ namespace CfiVerifier
             estimator.Visit(node); //necessary before querying the stack size estimate
             int stack_size_estimate = estimator.getStackEstimate(-1);
 
+            #region AL initial state precondition 1
             /* Add the the requirements on initial state */
             //requires LOAD_LE_64(mem, _guard_writeTable_ptr) == _bitmap_low
             NAryExpr load_ptr = new NAryExpr(Token.NoToken, new FunctionCall(load_64),
                 new List<Expr>() { new IdentifierExpr(Token.NoToken, mem), new IdentifierExpr(Token.NoToken, _guard_writeTable_ptr) });
             Expr linker_invariant = Expr.Eq(load_ptr, new IdentifierExpr(Token.NoToken, _bitmap_low));
             node.Proc.Requires.Add(new Requires(false, linker_invariant));
+            #endregion
 
+            #region AL initial state precondition 2
             //requires (forall i : bv64 :: LT_64(i, RSP) ==> !writable(mem, i)), but instantiated for locations on the current frame
             if (Options.instantiateQuantifiers && stack_size_estimate != -1) //Stack size estimator worked
             {
@@ -1926,9 +1929,11 @@ namespace CfiVerifier
                   Expr.Imp(Expr.And(in_stack, in_local_frame), i_not_writable));
                 node.Proc.Requires.Add(new Requires(false, assume_mem_false_expr));
             }
+            #endregion
 
 
             //requires RSP >= RSP_lowerbound && RSP < RSP_upperbound //note that these are not the stack bounds
+            #region AL initial state precondition 3
             Expr initial_RSP = Expr.And(Expr.And(
               new NAryExpr(Token.NoToken, new FunctionCall(ge_64),
                 new List<Expr>() { new IdentifierExpr(Token.NoToken, RSP), new LiteralExpr(Token.NoToken, BigNum.FromInt(layout.Item4.Item1), 64) }),
@@ -1937,7 +1942,7 @@ namespace CfiVerifier
               Expr.Eq(new BvExtractExpr(Token.NoToken, new IdentifierExpr(Token.NoToken, RSP), 3, 0), 
                                                        new LiteralExpr(Token.NoToken, BigNum.FromInt(0), 3)));
             node.Proc.Requires.Add(new Requires(false, initial_RSP));
-
+            #endregion
 
             /* Add axioms on memory layout -- these axioms dont sacrifice soundness BTW */
             this._prog.AddTopLevelDeclaration(new Axiom(Token.NoToken,
@@ -2171,6 +2176,7 @@ namespace CfiVerifier
                       }
                       //emit the instrumented implementation
                       Implementation new_impl = instrumentAssertion(original_impl, assertion.Item1, assertion.Item2, assertion.Item3);
+                      (new TaintPreserver(new_impl)).Visit(new_impl);
                       new_impl.Emit(tuo, 0);
                   }
                   finally
@@ -2227,6 +2233,125 @@ namespace CfiVerifier
             }
             //Console.WriteLine("We should capture mem here: {0}", currentNode.Label);
             return new Tuple<string, List<string>>(currentNode.Label, loopHeaderLabels);
+        }
+
+        private class TaintPreserver : StandardVisitor
+        {
+            private Implementation impl;
+            private Dictionary<Cmd, HashSet<Variable>> preserve_set { get; set; }
+            private HashSet<Variable> taint_set;
+
+            private readonly HashSet<String> preserved_tainted_vars_name = new HashSet<string>() { "mem" };
+            private HashSet<Variable> preserved_tainted_vars = new HashSet<Variable>();
+
+            public TaintPreserver(Implementation impl)
+            {
+                this.impl = impl;
+                this.preserve_set = new Dictionary<Cmd, HashSet<Variable>>();
+                this.taint_set = new HashSet<Variable>();
+                PerformTaintAnalysis();
+            }
+
+            private void PerformTaintAnalysis()
+            {
+                List<Cmd> reverse_cmds = new List<Cmd>();
+                foreach (Block b in this.impl.Blocks)
+                    reverse_cmds.AddRange(b.Cmds);
+                reverse_cmds.Reverse();
+                foreach (Cmd c in reverse_cmds) 
+                {
+                    preserve_set.Add(c, ComputeTaintedVariables(c));
+                    
+                }
+            }
+
+            private HashSet<Variable> ComputeTaintedVariables(Cmd c)
+            {
+                HashSet<Variable> cmd_tainted_vars = new HashSet<Variable>();
+                if (c is AssertCmd)
+                {
+                    cmd_tainted_vars = ComputeTaintedVariables((c as AssertCmd).Expr);
+                    this.taint_set.UnionWith(cmd_tainted_vars);
+               } 
+                if (!this.taint_set.Any())
+                    return cmd_tainted_vars;
+                else if (c is AssumeCmd)
+                {
+                    cmd_tainted_vars = ComputeTaintedVariables((c as AssumeCmd).Expr);
+                    this.taint_set.UnionWith(cmd_tainted_vars);
+                }
+                else if (c is AssignCmd)
+                {
+                    Utils.Assert((c as AssignCmd).Lhss.Count == 1 && (c as AssignCmd).Rhss.Count == 1, "Expected only one lhs and one rhs");
+                    Variable assignee = (c as AssignCmd).Lhss[0].DeepAssignedVariable;
+                    if (this.taint_set.Contains(assignee))
+                    {
+                        if (!this.preserved_tainted_vars.Contains(assignee))
+                            this.taint_set.Remove(assignee);
+                        foreach (Expr e in (c as AssignCmd).Rhss)
+                            cmd_tainted_vars = ComputeTaintedVariables(e);
+                        this.taint_set.UnionWith(cmd_tainted_vars);
+                        cmd_tainted_vars.Add(assignee);
+                    }
+                }
+                else if (c is HavocCmd)
+                {
+                    foreach (IdentifierExpr ie in (c as HavocCmd).Vars)
+                    {
+                        this.taint_set.Remove(ie.Decl);
+                        cmd_tainted_vars.Add(ie.Decl);
+                    }
+                }
+                return cmd_tainted_vars;
+            }
+
+            private HashSet<Variable> ComputeTaintedVariables(Expr e)
+            {
+                HashSet<Variable> expr_tainted_vars = new HashSet<Variable>();
+                if (e is NAryExpr)
+                    foreach (Expr sub_e in (e as NAryExpr).Args)
+                        expr_tainted_vars.UnionWith(ComputeTaintedVariables(sub_e));
+                else if (e is IdentifierExpr)
+                {
+                    Variable var = (e as IdentifierExpr).Decl;
+                    expr_tainted_vars.Add(var);
+                    if (this.preserved_tainted_vars_name.Contains(var.Name))
+                        this.preserved_tainted_vars.Add(var);
+                }
+                else if (e is BvExtractExpr)
+                    expr_tainted_vars.UnionWith(ComputeTaintedVariables((e as BvExtractExpr).Bitvector));
+                return expr_tainted_vars;
+            }
+
+            /*
+            public override Program VisitProgram(Program node)
+            {
+                this.mem = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("mem"));
+                Utils.Assert(this.mem != null, "Could not find mem variable");
+                if (Options.splitMemoryModel)
+                {
+                    this.mem_stack = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("mem_stack"));
+                    Utils.Assert(this.mem_stack != null, "Could not find mem_stack variable");
+                    this.mem_bitmap = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("mem_bitmap"));
+                    Utils.Assert(this.mem_bitmap != null, "Could not find mem_bitmap variable");
+                }
+                else
+                {
+                    this.mem_bitmap = this.mem;
+                    this.mem_stack = this.mem;
+                }
+                return base.VisitProgram(node);
+            }*/
+
+            public override List<Cmd> VisitCmdSeq(List<Cmd> cmdSeq)
+            {
+                List<Cmd> newCmdSeq = new List<Cmd>();
+                List<System.Type> removedCmdTypes = new List<System.Type>() {typeof(AssignCmd)};
+                foreach (Cmd c in cmdSeq)
+                    if (!removedCmdTypes.Contains(c.GetType()) || (this.preserve_set.ContainsKey(c) && this.preserve_set[c].Any()))
+                        newCmdSeq.Add(c);
+                return base.VisitCmdSeq(newCmdSeq);
+            }
         }
 
         public class LoopInvariantInstrumenter : StandardVisitor
@@ -2729,6 +2854,7 @@ namespace CfiVerifier
                               //instrument assert ((addrInStack(PLUS_64(t_a, 0bv64)) && GE_64(PLUS_64(t_a, 0bv64), old(RSP))) ==> 
                               //    writable(mem,PLUS_64(t_a, 0bv64)) || writable(mem,MINUS_64(t_a, 8bv64))) && (addrInBitmap(PLUS_64(t_a, 0bv64)) ==> 
                               //    LT_64(largestAddrAffected_8(mem, PLUS_64(t_a, 0bv64), t_v[8:0]), old(RSP - 8)));
+                              #region AL store_n(e_a, e_d) assert 1
                               Expr is_checkworthy_store = Expr.False;
                               foreach (int iter in new List<int>() { 0, iterations - 1}.Distinct()) //disjunction over a, a+n-1
                               {
@@ -2749,14 +2875,17 @@ namespace CfiVerifier
                                                                   new List<Expr>() { old_RSP, new LiteralExpr(Token.NoToken, BigNum.FromInt(40), 64) }) })));
                                 is_checkworthy_store = Expr.Or(is_checkworthy_store, Expr.And(addr_in_stack, Expr.And(addr_not_in_backing_space, addr_in_parent_frame)));
                               }
-                                //Fix for the padding issue. Enough to check writability of (addr + 0). It's an invariant that /guard:cfw maintains
+
+                              //Fix for the padding issue. Enough to check writability of (addr + 0). It's an invariant that /guard:cfw maintains
                               Expr is_writable = new NAryExpr(Token.NoToken, new FunctionCall(writable),
                                   new List<Expr>() { new IdentifierExpr(Token.NoToken, mem_bitmap), OffsetExpr(0) });
                               Expr check_for_stack_store = Expr.Imp(is_checkworthy_store, is_writable);
                               assertion = new AssertCmd(Token.NoToken, check_for_stack_store);
                               newCmdSeq.Add(assertion);
                               Utils.VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion);
+                              #endregion
 
+                              #region AL store_n(e_a, e_d) assert 2
                               for (int iter = 0; iter < iterations; iter++)
                               {
                                 Expr addr_in_bitmap = new NAryExpr(Token.NoToken, new FunctionCall(addrInBitmap),
@@ -2794,6 +2923,7 @@ namespace CfiVerifier
                                 assertion = new AssertCmd(Token.NoToken, check_for_bitmap_store);
                                 newCmdSeq.Add(assertion);
                                 Utils.VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion);
+                              #endregion
                               }
 
                               if (Options.confidentiality) 
@@ -2879,6 +3009,7 @@ namespace CfiVerifier
                       {
                           int numAssertsBeforeReturn = Utils.VCSplitter.Instance.getCurrentAssertionCount();
                           //these are the asserts we place on return statement. why not just make them postconditions?
+                          #region AL return assert 2 opt
                           //forall i. i < old(rsp) && i[3:0] == 0bv3 ==> ¬writable(mem,i)
                           AssertCmd assertion;
                           if (this.bound_stacksize_option && Options.instantiateQuantifiers) //can only instantiate quantifiers on bounded 
@@ -2905,6 +3036,8 @@ namespace CfiVerifier
                               Console.WriteLine("VCSplitter says that ret produced assertions ({0},{1})", numAssertsBeforeReturn, numAssertsAfterReturn - 1);
                               //assertion = new AssertCmd(Token.NoToken, instantiation);
                           }
+                          #endregion
+                          #region AL return assert 2 no-opt
                           else
                           {
                               BoundVariable i = new BoundVariable(Token.NoToken, new TypedIdent(Token.NoToken, "i", this.mem.TypedIdent.Type.AsMap.Arguments[0]));
@@ -2930,12 +3063,14 @@ namespace CfiVerifier
                               newCmdSeq.Add(assertion);
                               Utils.VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion);
                           }
+                          #endregion
 
-
+                          #region AL return assert 1
                           //rsp == old(rsp)
                           assertion = new AssertCmd(Token.NoToken, Expr.Eq(new IdentifierExpr(Token.NoToken, RSP),
                                                                              new OldExpr(Token.NoToken, new IdentifierExpr(Token.NoToken, RSP))));
                           newCmdSeq.Add(assertion);
+                          #endregion
                           Utils.VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion);
                       }
                       else if (attribute_cmdtype != null && attribute_cmdtype.Equals("call"))
@@ -2945,6 +3080,7 @@ namespace CfiVerifier
                           string attribute_target = QKeyValue.FindStringAttribute(ac.Attributes, "SlashVerifyCallTarget");
                           Utils.Assert(attribute_target != null, "Expected SlashVerifyCallTarget attribute on call");
 
+                          #region AL call assert 1
                           //assert policy(target);
                           Expr is_policy;
                           if (attribute_target.Substring(0, 2).Equals("0x"))
@@ -2967,7 +3103,9 @@ namespace CfiVerifier
                               newCmdSeq.Add(assertion);
                               Utils.VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion);
                           }
+                          #endregion
 
+                          #region AL call assert 2 no opt
                           if (!this.bound_stacksize_option)
                           {
                               //forall i. i < (rsp - 8) ==> ¬writable(mem,i) //rsp - 8 holds return address, and everything below that must start off as non writable
@@ -2999,6 +3137,8 @@ namespace CfiVerifier
                               newCmdSeq.Add(assertion);
                               Utils.VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion);
                           }
+                          #endregion
+                          #region AL call assert 2 opt
                           else
                           {
                               //assert that RSP is not lower than bound_stacksize_offset. if RSP has not gotten lower, than we know everything is writable below
@@ -3012,7 +3152,9 @@ namespace CfiVerifier
                               newCmdSeq.Add(assertion);
                               Utils.VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion);
                           }
+                          #endregion
 
+                          #region AL call assert:
                           //assert RSP <= (old(RSP) - 32)
                           NAryExpr stack_backing_space = new NAryExpr(Token.NoToken, new FunctionCall(le_64),
                             new List<Expr>() { new IdentifierExpr(Token.NoToken, RSP), 
@@ -3021,6 +3163,7 @@ namespace CfiVerifier
                                                                     new LiteralExpr(Token.NoToken, BigNum.FromInt(32), 64) }) });
                           assertion = new AssertCmd(Token.NoToken, stack_backing_space);
                           newCmdSeq.Add(assertion);
+                          #endregion
                           Utils.VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion);
                       }
                       else if (attribute_cmdtype != null && attribute_jmptarget != null &&
