@@ -2216,7 +2216,7 @@ namespace CfiVerifier
 
                   new_prog.Emit(ttw);
                   Utils.ParseString(sw.ToString(), out new_prog);
-                  (new TaintPreserver(new_prog, impl_counter)).Visit(new_prog);
+                  (new TaintPreserver(new_prog, assertion.Item1, impl_counter)).Visit(new_prog);
 
                   sw.Close();
                   ttw.Close();
@@ -2299,8 +2299,8 @@ namespace CfiVerifier
         {
             private Program prog;
             private Implementation impl;
+            private string source_block_label;
             private Dictionary<Cmd, HashSet<Variable>> cmd_preserve_set { get; set; }
-            private HashSet<Variable> taint_set;
             private HashSet<Variable> touched_variables;
             private HashSet<string> touched_memory_locations;
             private int count;
@@ -2308,13 +2308,13 @@ namespace CfiVerifier
             private readonly List<String> preserved_tainted_vars_name = new List<String>() { "mem" };
             private HashSet<Variable> preserved_tainted_vars = new HashSet<Variable>();
 
-            public TaintPreserver(Program prog, int count)
+            public TaintPreserver(Program prog, string source_block_label, int count)
             {
                 Utils.Assert(prog.Implementations.Count() == 1, "Expecting a single implementation");
                 this.impl = prog.Implementations.ElementAt(0);
                 this.prog = prog;
+                this.source_block_label = source_block_label;
                 this.cmd_preserve_set = new Dictionary<Cmd, HashSet<Variable>>();
-                this.taint_set = new HashSet<Variable>();
                 this.touched_variables = new HashSet<Variable>();
                 this.touched_memory_locations = new HashSet<string>();
                 this.count = count;
@@ -2336,7 +2336,7 @@ namespace CfiVerifier
 
                 foreach (Block b in this.impl.Blocks) 
                 {
-                    if (b.Cmds.Where(i => (i is AssertCmd) && !((i as AssertCmd).Expr is LiteralExpr)).Any()) 
+                    if (b.Label.Equals(this.source_block_label)) 
                     {
                         source_block = b;
                     }
@@ -2357,6 +2357,22 @@ namespace CfiVerifier
                 {
                     ComputePaths(source_block, cfg, reverse_cmds, new List<Block>());
                 }
+                object union_lock = new object();
+                Parallel.ForEach(reverse_cmds, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, lc =>
+                {
+                    Dictionary<Cmd, HashSet<Variable>> path_preserve_set = new Dictionary<Cmd, HashSet<Variable>>();
+                    HashSet<Variable> path_taint_set = new HashSet<Variable>();
+                    foreach (Cmd c in lc)
+                    {
+                        path_preserve_set.Add(c, ComputeTaintedVariables(c, path_taint_set));
+                    }
+                    lock (union_lock)
+                    {
+                        path_preserve_set.ToList().ForEach(i => cmd_preserve_set[i.Key].UnionWith(i.Value));
+                        this.touched_variables.Union(path_preserve_set.SelectMany(i => i.Value));
+                    }
+                });
+                /*
                 foreach (List<Cmd> lc in reverse_cmds)
                 {
                     this.taint_set.Clear();
@@ -2364,7 +2380,7 @@ namespace CfiVerifier
                     {
                         cmd_preserve_set[c].UnionWith(ComputeTaintedVariables(c));
                     }
-                }
+                }*/
             }
 
             private List<List<Cmd>> ComputePaths(Block source_block, ICFG cfg, List<List<Cmd>> paths, List<Block> visited_blocks)
@@ -2398,41 +2414,34 @@ namespace CfiVerifier
                 return new_paths;
             }
 
-            private HashSet<Variable> ComputeTaintedVariables(Cmd c)
+            private HashSet<Variable> ComputeTaintedVariables(Cmd c, HashSet<Variable> taint_set)
             {
                 HashSet<Variable> cmd_tainted_vars = new HashSet<Variable>();
                 if (c is AssertCmd)
                 {
                     cmd_tainted_vars = ComputeTaintedVariables((c as AssertCmd).Expr);
-                    this.taint_set.UnionWith(cmd_tainted_vars);
-                    string target = QKeyValue.FindStringAttribute((c as AssertCmd).Attributes, "SlashVerifyCallTarget")
-                        ?? QKeyValue.FindStringAttribute((c as AssertCmd).Attributes, "SlashVerifyJmpTarget")
-                        ?? "";
-                    if (target != "")
-                    {
-                        this.touched_memory_locations.Add(target);
-                    }
+                    taint_set.UnionWith(cmd_tainted_vars);
                 } 
-                if (!this.taint_set.Any())
+                if (!taint_set.Any())
                 {
                     return cmd_tainted_vars;
                 }
                 else if (c is AssumeCmd)
                 {
                     cmd_tainted_vars = ComputeTaintedVariables((c as AssumeCmd).Expr);
-                    this.taint_set.UnionWith(cmd_tainted_vars);
+                    taint_set.UnionWith(cmd_tainted_vars);
                 }
                 else if (c is AssignCmd)
                 {
                     Utils.Assert((c as AssignCmd).Lhss.Count == 1 && (c as AssignCmd).Rhss.Count == 1, "Expected only one lhs and one rhs");
                     Variable assignee = (c as AssignCmd).Lhss[0].DeepAssignedVariable;
-                    if (this.taint_set.Contains(assignee))
+                    if (taint_set.Contains(assignee))
                     {
                         if (!this.preserved_tainted_vars.Contains(assignee))
-                            this.taint_set.Remove(assignee);
+                            taint_set.Remove(assignee);
                         foreach (Expr e in (c as AssignCmd).Rhss)
                             cmd_tainted_vars = ComputeTaintedVariables(e);
-                        this.taint_set.UnionWith(cmd_tainted_vars);
+                        taint_set.UnionWith(cmd_tainted_vars);
                         cmd_tainted_vars.Add(assignee);
                     }
                 }
@@ -2440,11 +2449,10 @@ namespace CfiVerifier
                 {
                     foreach (IdentifierExpr ie in (c as HavocCmd).Vars)
                     {
-                        this.taint_set.Remove(ie.Decl);
+                        taint_set.Remove(ie.Decl);
                         cmd_tainted_vars.Add(ie.Decl);
                     }
                 }
-                this.touched_variables.UnionWith(cmd_tainted_vars);
                 return cmd_tainted_vars;
             }
 
