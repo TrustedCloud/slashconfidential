@@ -2213,36 +2213,15 @@ namespace CfiVerifier
                           new_impl = instrumentAssertion(original_impl, assertion.Item1, assertion.Item2, assertion.Item3);
                           new_prog.AddTopLevelDeclaration(new_impl);
                       }
-
                   new_prog.Emit(ttw);
                   Utils.ParseString(sw.ToString(), out new_prog);
-                  (new TaintPreserver(new_prog, assertion.Item1, impl_counter)).Visit(new_prog);
-
+                  Console.WriteLine("Now analysing split {0}.", impl_counter);
+                  (new TaintPreserver(new_prog, assertion, impl_counter)).Visit(new_prog);
                   sw.Close();
                   ttw.Close();
                   ttw = new TokenTextWriter(filename);
                   new_prog.Emit(ttw);
                   ttw.Close();
-                  /*
-                  try
-                  {
-                      //emit all the vars, consts, functions, axioms, and typedecls
-                      foreach (Declaration d in prog.TopLevelDeclarations)
-                      {
-                          if (!(d is Implementation))
-                          {
-                              d.Emit(tuo, 0);
-                          }
-                      }
-                      //emit the instrumented implementation
-                      Implementation new_impl = instrumentAssertion(original_impl, assertion.Item1, assertion.Item2, assertion.Item3);
-                      (new TaintPreserver(new_impl)).Visit(new_impl);
-                      new_impl.Emit(tuo, 0);
-                  }
-                  finally
-                  {
-                      tuo.Close();
-                  }*/
                   impl_counter++;
               }
               Console.WriteLine("VCSplitter generated {0} assertions", assertions.Count);
@@ -2299,30 +2278,23 @@ namespace CfiVerifier
         {
             private Program prog;
             private Implementation impl;
-            private string source_block_label;
+            private Block source_block;
             private Dictionary<Cmd, HashSet<Variable>> cmd_preserve_set { get; set; }
-            private HashSet<Variable> touched_variables;
-            private HashSet<string> touched_memory_locations;
             private int count;
 
-            private readonly List<String> preserved_tainted_vars_name = new List<String>() { "mem" };
-            private HashSet<Variable> preserved_tainted_vars = new HashSet<Variable>();
-
-            public TaintPreserver(Program prog, string source_block_label, int count)
+            public TaintPreserver(Program prog, Tuple<string, Cmd, AssertCmd> assertion_info, int count)
             {
                 Utils.Assert(prog.Implementations.Count() == 1, "Expecting a single implementation");
                 this.impl = prog.Implementations.ElementAt(0);
                 this.prog = prog;
-                this.source_block_label = source_block_label;
                 this.cmd_preserve_set = new Dictionary<Cmd, HashSet<Variable>>();
-                this.touched_variables = new HashSet<Variable>();
-                this.touched_memory_locations = new HashSet<string>();
                 this.count = count;
-                foreach (Variable v in this.prog.Variables)
+                this.source_block = this.impl.Blocks.First(i => i.Label.Equals(assertion_info.Item1));
+                foreach (Block b in this.impl.Blocks)
                 {
-                    if (this.preserved_tainted_vars_name.Contains(v.Name))
+                    foreach (Cmd c in b.Cmds)
                     {
-                        this.preserved_tainted_vars.Add(v);
+                        this.cmd_preserve_set.Add(c, new HashSet<Variable>());
                     }
                 }
                 PerformTaintAnalysis();
@@ -2330,88 +2302,65 @@ namespace CfiVerifier
 
             private void PerformTaintAnalysis()
             {
-                List<List<Cmd>> reverse_cmds = new List<List<Cmd>>();
-                ICFG cfg = new ICFG(this.impl);
-                Block source_block = null;
-
-                foreach (Block b in this.impl.Blocks) 
+                List<List<Block>> paths = this.ComputePaths();
+                object preserve_lock = new object();
+                Parallel.ForEach(paths, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, (path =>
                 {
-                    if (b.Label.Equals(this.source_block_label)) 
-                    {
-                        source_block = b;
-                    }
-                    foreach (Cmd c in b.Cmds)
-                    {
-                        this.cmd_preserve_set.Add(c, new HashSet<Variable>());
-                    }
-                } 
-
-                Utils.Assert(source_block != null, "Did not find assert block in implementation.");
-                if (cfg.predEdges[source_block].Count() == 0)
-                {
-                    List<Cmd> source_blocks_cmds = new List<Cmd>(source_block.Cmds);
-                    source_blocks_cmds.Reverse();
-                    reverse_cmds.Add(source_blocks_cmds);
-                }
-                else
-                {
-                    ComputePaths(source_block, cfg, reverse_cmds, new List<Block>());
-                }
-                object union_lock = new object();
-                Parallel.ForEach(reverse_cmds, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, lc =>
-                {
-                    Dictionary<Cmd, HashSet<Variable>> path_preserve_set = new Dictionary<Cmd, HashSet<Variable>>();
                     HashSet<Variable> path_taint_set = new HashSet<Variable>();
-                    foreach (Cmd c in lc)
+                    Dictionary<Cmd, HashSet<Variable>> path_preserve_set = new Dictionary<Cmd, HashSet<Variable>>();
+                    foreach (Block b in path)
                     {
-                        path_preserve_set.Add(c, ComputeTaintedVariables(c, path_taint_set));
+                        foreach (Cmd c in b.Cmds.AsEnumerable().Reverse())
+                        {
+                            path_preserve_set[c] = ComputeTaintedVariables(c, path_taint_set);
+                        }
                     }
-                    lock (union_lock)
+                    lock (preserve_lock)
                     {
                         path_preserve_set.ToList().ForEach(i => cmd_preserve_set[i.Key].UnionWith(i.Value));
-                        this.touched_variables.Union(path_preserve_set.SelectMany(i => i.Value));
                     }
-                });
-                /*
-                foreach (List<Cmd> lc in reverse_cmds)
-                {
-                    this.taint_set.Clear();
-                    foreach (Cmd c in lc)
-                    {
-                        cmd_preserve_set[c].UnionWith(ComputeTaintedVariables(c));
-                    }
-                }*/
+                }));
             }
 
-            private List<List<Cmd>> ComputePaths(Block source_block, ICFG cfg, List<List<Cmd>> paths, List<Block> visited_blocks)
+            private List<List<Block>> ComputePaths()
             {
-                List<List<Cmd>> new_paths = new List<List<Cmd>>();
-                List<Cmd> path_header = new List<Cmd>(source_block.Cmds);
-                path_header.Reverse();
-                visited_blocks.Add(source_block);
-                if (!cfg.predEdges[source_block].Any())
+                ICFG cfg = new ICFG(this.impl);
+                List<Block> visited_blocks = new List<Block>();
+                List<Block> pred_blocks = new List<Block> { this.source_block };
+                List<List<Block>> paths = new List<List<Block>>();
+                List<List<Block>> current_paths = new List<List<Block>>();
+                Block current_block;
+                current_paths.Add(new List<Block> { this.source_block });
+                while (pred_blocks.Any())
                 {
-                    new_paths.Add(path_header);
-                }
-                else
-                {
-                    foreach (Block pred in cfg.predEdges[source_block])
+                    current_block = pred_blocks.ElementAt(0);
+                    if (!cfg.predEdges[current_block].Any())
                     {
-                        if (visited_blocks.Contains(pred))
+                        paths.Add(current_paths.First(i => i.Last().Equals(current_block)));
+                    }
+                    else if (cfg.predEdges[current_block].Count() == 1) 
+                    {
+                        foreach (List<Block> path in current_paths.Where(i => i.Last().Equals(current_block)))
                         {
-                            new_paths.Add(path_header);
+                            path.Add(cfg.predEdges[current_block].First());
                         }
-                        else
+                    }
+                    else 
+                    {
+                        foreach (List<Block> path in current_paths.Where(i => i.Last().Equals(current_block)).ToList()) 
                         {
-                            foreach(List<Cmd> path in ComputePaths(pred, cfg, new List<List<Cmd>>(paths), new List<Block>(visited_blocks))) 
+                            current_paths.Remove(path);
+                            foreach (Block pred in cfg.predEdges[current_block])
                             {
-                                new_paths.Add(path_header.Concat(path).ToList());
+                                current_paths.Add(path.Concat(new List<Block>{pred}).ToList());
                             }
                         }
                     }
+                    visited_blocks.Add(current_block);
+                    pred_blocks.Remove(current_block);
+                    pred_blocks.AddRange(cfg.predEdges[current_block].Except(visited_blocks));
                 }
-                paths.AddRange(new_paths);
-                return new_paths;
+                return paths;
             }
 
             private HashSet<Variable> ComputeTaintedVariables(Cmd c, HashSet<Variable> taint_set)
@@ -2422,10 +2371,6 @@ namespace CfiVerifier
                     cmd_tainted_vars = ComputeTaintedVariables((c as AssertCmd).Expr);
                     taint_set.UnionWith(cmd_tainted_vars);
                 } 
-                if (!taint_set.Any())
-                {
-                    return cmd_tainted_vars;
-                }
                 else if (c is AssumeCmd)
                 {
                     cmd_tainted_vars = ComputeTaintedVariables((c as AssumeCmd).Expr);
@@ -2437,8 +2382,7 @@ namespace CfiVerifier
                     Variable assignee = (c as AssignCmd).Lhss[0].DeepAssignedVariable;
                     if (taint_set.Contains(assignee))
                     {
-                        if (!this.preserved_tainted_vars.Contains(assignee))
-                            taint_set.Remove(assignee);
+                        taint_set.Remove(assignee);
                         foreach (Expr e in (c as AssignCmd).Rhss)
                             cmd_tainted_vars = ComputeTaintedVariables(e);
                         taint_set.UnionWith(cmd_tainted_vars);
@@ -2479,34 +2423,6 @@ namespace CfiVerifier
                 return expr_tainted_vars;
             }
 
-            /*
-            public override Program VisitProgram(Program node)
-            {
-                foreach (Declaration d in node.TopLevelDeclarations.ToList())
-                {
-                    if (d is Variable && !(d as Variable).Name.StartsWith("_") && !this.touched_variables.Contains(d as Variable))
-                    {
-                        node.RemoveTopLevelDeclaration(d);
-                    }
-                    else if (d is Axiom && (d as Axiom).Expr is NAryExpr)
-                    {
-                        NAryExpr naexpr = (d as Axiom).Expr as NAryExpr;
-                        if (naexpr.Fun.FunctionName == "policy" && naexpr.Args.Count == 1 && !this.touched_memory_locations.Contains(naexpr.Args.ElementAt(0).ToString()))
-                            node.RemoveTopLevelDeclaration(d);
-                    }
-                }
-                return base.VisitProgram(node);
-            }
-
-            public override Procedure VisitProcedure(Procedure node)
-            {
-                foreach (IdentifierExpr e in node.Modifies.Where(i => !this.touched_variables.Contains(i.Decl)).ToList())
-                {
-                    node.Modifies.Remove(e);
-                }
-                return base.VisitProcedure(node);
-            }*/
-
             public override List<Cmd> VisitCmdSeq(List<Cmd> cmdSeq)
             {
                 List<Cmd> newCmdSeq = new List<Cmd>();
@@ -2515,23 +2431,10 @@ namespace CfiVerifier
                 {
                     if (!removedCmdTypes.Contains(c.GetType()) || (this.cmd_preserve_set.ContainsKey(c) && this.cmd_preserve_set[c].Any()))
                     {
-/*                        if (!ParseCmdVars(c))
-                            continue;*/
                         newCmdSeq.Add(c);
                     }
                 }
                 return base.VisitCmdSeq(newCmdSeq);
-            }
-
-            private bool ParseCmdVars(Cmd c)
-            {
-                if (c is HavocCmd)
-                {
-                    HavocCmd hc = c as HavocCmd;
-                    hc.Vars.Intersect(hc.Vars.Where(i => !this.touched_variables.Contains(i.Decl)));
-                    return hc.Vars.Any();
-                }
-                return true;
             }
         }
 
