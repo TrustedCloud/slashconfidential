@@ -42,28 +42,22 @@ namespace CfiVerifier
             public override Program VisitProgram(Program node)
             {
                 //find a mem variable and add mem_oldbitmap of the same type as mem
-                this.mem = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("mem"));
-                Utils.Assert(this.mem != null, "Could not find mem variable");
+                this.mem = Utils.FindGlobalVariableInProgram(node, "mem");
                 if (Options.splitMemoryModel)
                 {
-                    this.mem_stack = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("mem_stack"));
-                    Utils.Assert(this.mem_stack != null, "Could not find mem_stack variable");
-                    this.mem_bitmap = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("mem_bitmap"));
-                    Utils.Assert(this.mem_bitmap != null, "Could not find mem_bitmap variable");
+                    this.mem_stack = Utils.FindGlobalVariableInProgram(node, "mem_stack");
+                    this.mem_bitmap = Utils.FindGlobalVariableInProgram(node, "mem_bitmap");
                 }
                 else
                 {
                     this.mem_bitmap = this.mem;
                     this.mem_stack = this.mem;
                 }
-                this.addrInBitmap = node.Functions.FirstOrDefault(f => f.Name.Equals("addrInBitmap"));
-                Utils.Assert(this.addrInBitmap != null, "Could not find addrInBitmap(.) function");
-                this.load_64 = node.Functions.FirstOrDefault(f => f.Name.Equals("LOAD_LE_64"));
-                Utils.Assert(this.load_64 != null, "Could not find LOAD_LE_64(.,.) function");
-                this._bitmap_low = node.Constants.FirstOrDefault(c => c.Name.Equals("_bitmap_low"));
-                Utils.Assert(this._bitmap_low != null, "Could not find _bitmap_low constant");
-                this._guard_writeTable_ptr = node.Constants.FirstOrDefault(c => c.Name.Equals("_guard_writeTable_ptr"));
-                Utils.Assert(this._guard_writeTable_ptr != null, "Could not find _guard_writeTable_ptr constant");
+
+                this.addrInBitmap = Utils.FindFunctionInProgram(node, "addrInBitmap");
+                this.load_64 = Utils.FindFunctionInProgram(node, "LOAD_LE_64");
+                this._bitmap_low = Utils.FindConstantInProgram(node, "_bitmap_low");
+                this._guard_writeTable_ptr = Utils.FindConstantInProgram(node, "_guard_writeTable_ptr");
 
                 this.mem_oldbitmap = new GlobalVariable(Token.NoToken, new TypedIdent(Token.NoToken, "mem_oldbitmap", this.mem.TypedIdent.Type));
                 node.AddTopLevelDeclaration(this.mem_oldbitmap);

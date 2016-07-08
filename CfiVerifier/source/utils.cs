@@ -80,6 +80,26 @@ namespace CfiVerifier
             return new GlobalVariable(Token.NoToken, new TypedIdent(Token.NoToken, v, t));
         }
 
+        public static Function FindFunctionInProgram(Program node, string name) {
+            Function func = node.Functions.FirstOrDefault(f => f.Name.Equals(name));
+            Utils.Assert(func != null, "Could not find function " + name);
+            return func;
+        }
+
+        public static GlobalVariable FindGlobalVariableInProgram(Program node, string name)
+        {
+            GlobalVariable gv = node.GlobalVariables.FirstOrDefault(f => f.Name.Equals(name));
+            Utils.Assert(gv != null, "Could not find global variable " + name);
+            return gv;
+        }
+
+        public static Constant FindConstantInProgram(Program node, string name)
+        {
+            Constant c = node.Constants.FirstOrDefault(f => f.Name.Equals(name));
+            Utils.Assert(c != null, "Could not find constant " + name);
+            return c;
+        }
+
         #region AssignCmd classifiers
         public enum SlashVerifyCmdType { None, Load8, Load16, Load32, Load64, Store8, Store16, Store32, Store64, RepStosB };
         /* looks at the function used in the NAryExpr to determine the type: LOAD8, LOAD16,...,STORE64 */

@@ -26,13 +26,10 @@ namespace CfiVerifier
 
         public override Program VisitProgram(Program node)
         {
-            this.addrInBitmap = node.Functions.FirstOrDefault(f => f.Name.Equals("addrInBitmap"));
-            Utils.Assert(this.addrInBitmap != null, "Could not find addrInBitmap(.) function");
-            this.addrInStack = node.Functions.FirstOrDefault(f => f.Name.Equals("addrInStack"));
-            Utils.Assert(this.addrInStack != null, "Could not find addrInStack(.) function");
+            this.addrInBitmap = Utils.FindFunctionInProgram(node, "addrInBitmap");
+            this.addrInStack = Utils.FindFunctionInProgram(node, "addrInStack");
 
-            this.mem = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("mem"));
-            Utils.Assert(this.mem != null, "Could not find mem variable");
+            this.mem = Utils.FindGlobalVariableInProgram(node, "mem");
 
             return base.VisitProgram(node);
         }
@@ -137,26 +134,17 @@ namespace CfiVerifier
 
         public override Program VisitProgram(Program node)
         {
-            this.addrInBitmap = node.Functions.FirstOrDefault(f => f.Name.Equals("addrInBitmap"));
-            Utils.Assert(this.addrInBitmap != null, "Could not find addrInBitmap(.) function");
-            this.addrInStack = node.Functions.FirstOrDefault(f => f.Name.Equals("addrInStack"));
-            Utils.Assert(this.addrInStack != null, "Could not find addrInStack(.) function");
+            this.addrInBitmap = Utils.FindFunctionInProgram(node, "addrInBitmap");
+            this.addrInStack = Utils.FindFunctionInProgram(node, "addrInStack");
+            this.lt_64 = Utils.FindFunctionInProgram(node, "LT_64");
+            this.ge_64 = Utils.FindFunctionInProgram(node, "GE_64");
 
-            this.lt_64 = node.Functions.FirstOrDefault(f => f.Name.Equals("LT_64"));
-            Utils.Assert(this.lt_64 != null, "Could not find LT_64(.,.) function");
-            this.ge_64 = node.Functions.FirstOrDefault(f => f.Name.Equals("GE_64"));
-            Utils.Assert(this.ge_64 != null, "Could not find GE_64(.,.) function");
-            this.stack_low = node.Constants.FirstOrDefault(x => x.Name.Equals("_stack_low"));
-            Utils.Assert(this.stack_low != null, "Could not find _stack_low variable");
-            this.stack_high = node.Constants.FirstOrDefault(x => x.Name.Equals("_stack_high"));
-            Utils.Assert(this.stack_high != null, "Could not find _stack_high variable");
-            this.bitmap_low = node.Constants.FirstOrDefault(x => x.Name.Equals("_bitmap_low"));
-            Utils.Assert(this.bitmap_low != null, "Could not find _bitmap_low variable");
-            this.bitmap_high = node.Constants.FirstOrDefault(x => x.Name.Equals("_bitmap_high"));
-            Utils.Assert(this.bitmap_high != null, "Could not find _bitmap_high variable");
+            this.stack_low = Utils.FindConstantInProgram(node, "_stack_low");
+            this.stack_high = Utils.FindConstantInProgram(node, "_stack_high");
+            this.bitmap_low = Utils.FindConstantInProgram(node, "_bitmap_low");
+            this.bitmap_high = Utils.FindConstantInProgram(node, "_bitmap_high");
 
-            this.mem = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("mem"));
-            Utils.Assert(this.mem != null, "Could not find mem variable");
+            this.mem = Utils.FindGlobalVariableInProgram(node, "mem");
 
             return base.VisitProgram(node);
         }
@@ -252,13 +240,9 @@ namespace CfiVerifier
         {
             if (!Options.splitMemoryModel) { return base.VisitProgram(node); }
 
-            this.addrInBitmap = node.Functions.FirstOrDefault(f => f.Name.Equals("addrInBitmap"));
-            Utils.Assert(this.addrInBitmap != null, "Could not find addrInBitmap(.) function");
-            this.addrInStack = node.Functions.FirstOrDefault(f => f.Name.Equals("addrInStack"));
-            Utils.Assert(this.addrInStack != null, "Could not find addrInStack(.) function");
-
-            this.mem = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("mem"));
-            Utils.Assert(this.mem != null, "Could not find mem variable");
+            this.addrInBitmap = Utils.FindFunctionInProgram(node, "addrInBitmap");
+            this.addrInStack = Utils.FindFunctionInProgram(node, "addrInStack");
+            this.mem = Utils.FindGlobalVariableInProgram(node, "mem");
 
             this.mem_stack = Utils.MkGlobalVar("mem_stack", this.mem.TypedIdent.Type);
             node.AddTopLevelDeclaration(this.mem_stack); //add as global variable

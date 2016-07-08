@@ -38,14 +38,10 @@ namespace CfiVerifier
 
         public override Program VisitProgram(Program node)
         {
-            this.plus_64 = node.Functions.FirstOrDefault(f => f.Name.Equals("PLUS_64"));
-            Utils.Assert(this.plus_64 != null, "Could not find PLUS_64(.,.) function");
-            this.not_1 = node.Functions.FirstOrDefault(f => f.Name.Equals("NOT_1"));
-            Utils.Assert(this.not_1 != null, "Could not find NOT_1(.,.) function");
-            this.rep_stosb = node.Functions.FirstOrDefault(f => f.Name.Equals("REP_STOSB"));
-            Utils.Assert(this.rep_stosb != null, "Could not find REP_STOSB(.,.,.) function");
-            this.policy = node.Functions.FirstOrDefault(f => f.Name.Equals("policy"));
-            Utils.Assert(this.policy != null, "Could not find policy(.,.,.) function");
+            this.plus_64 = Utils.FindFunctionInProgram(node, "PLUS_64");
+            this.not_1 = Utils.FindFunctionInProgram(node, "NOT_1");
+            this.rep_stosb = Utils.FindFunctionInProgram(node, "REP_STOSB");
+            this.policy = Utils.FindFunctionInProgram(node, "policy");
 
             this.mem = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("mem"));
             Utils.Assert(this.mem != null, "Could not find mem variable");
@@ -71,26 +67,16 @@ namespace CfiVerifier
                 }
             }
 
-            this.RSP = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("RSP"));
-            Utils.Assert(this.RSP != null, "Could not find RSP variable");
-            this.RAX = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("RAX"));
-            Utils.Assert(this.RAX != null, "Could not find RAX variable");
-            this.RDI = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("RDI"));
-            Utils.Assert(this.RDI != null, "Could not find RDI variable");
-            this.RDX = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("RDX"));
-            Utils.Assert(this.RDX != null, "Could not find RDX variable");
-            this.R8 = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("R8"));
-            Utils.Assert(this.R8 != null, "Could not find R8 variable");
-            this.R9 = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("R9"));
-            Utils.Assert(this.R9 != null, "Could not find R9 variable");
-            this.R10 = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("R10"));
-            Utils.Assert(this.R10 != null, "Could not find R10 variable");
-            this.R11 = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("R11"));
-            Utils.Assert(this.R11 != null, "Could not find R11 variable");
-            this.RCX = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("RCX"));
-            Utils.Assert(this.RCX != null, "Could not find RCX variable");
-            this.CF = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("CF"));
-            Utils.Assert(this.CF != null, "Could not find CF variable");
+            this.RSP = Utils.FindGlobalVariableInProgram(node, "RSP");
+            this.RAX = Utils.FindGlobalVariableInProgram(node, "RAX");
+            this.RDI = Utils.FindGlobalVariableInProgram(node, "RDI");
+            this.RDX = Utils.FindGlobalVariableInProgram(node, "RDX");
+            this.R8 = Utils.FindGlobalVariableInProgram(node, "R8");
+            this.R9 = Utils.FindGlobalVariableInProgram(node, "R9");
+            this.R10 = Utils.FindGlobalVariableInProgram(node, "R10");
+            this.R11 = Utils.FindGlobalVariableInProgram(node, "R11");
+            this.RCX = Utils.FindGlobalVariableInProgram(node, "RCX");
+            this.CF = Utils.FindGlobalVariableInProgram(node, "CF");
 
             foreach (String s in new HashSet<String>() { Options.funcMemcmp, Options.funcMemcpy, Options.funcMemset, Options.funcSGXFree, Options.funcSGXMalloc })
             {
