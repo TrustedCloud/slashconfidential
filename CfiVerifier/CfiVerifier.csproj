@@ -54,10 +54,20 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Properties\assemblyInfo.cs" />
+    <Compile Include="source\DeadCodeEliminator.cs" />
+    <Compile Include="source\HavocingAdversary.cs" />
+    <Compile Include="source\LoopDetector.cs" />
+    <Compile Include="source\LoopInvariants.cs" />
     <Compile Include="source\main.cs" />
+    <Compile Include="source\ModularVerificationSetup.cs" />
     <Compile Include="source\options.cs" />
+    <Compile Include="source\ProofObligations.cs" />
+    <Compile Include="source\SpecialInstructionLifter.cs" />
+    <Compile Include="source\SplitMemoryModeler.cs" />
+    <Compile Include="source\StackSizeEstimator.cs" />
     <Compile Include="source\utils.cs" />
     <Compile Include="source\vc.cs" />
+    <Compile Include="source\VCSplitter.cs" />
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include=".NETFramework,Version=v4.0,Profile=Client">

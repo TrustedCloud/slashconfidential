@@ -68,17 +68,17 @@ namespace CfiVerifier
             bool old_option = Options.splitMemoryModel;
             Options.splitMemoryModel = false;
 
-            (new Utils.SpecialInstructionLifter()).Visit(prog);
-            (new Utils.ModularVerificationSetup()).Visit(prog);
-            (new Utils.EnvironmentSetup()).Visit(prog);
+            (new SpecialInstructionLifter()).Visit(prog);
+            (new ModularVerificationSetup()).Visit(prog);
+            (new EnvironmentSetup()).Visit(prog);
 
-            Utils.VCSplitter.LaunchVCSplitter(impl);
+            VCSplitter.LaunchVCSplitter(impl);
             if (store) { 
-                (new Utils.StoreAddressDecider()).Visit(prog);
-                addressRegionDB = Utils.VCSplitter.Instance.VerifyInstrumentedProcedures(prog);
+                (new StoreAddressDecider()).Visit(prog);
+                addressRegionDB = VCSplitter.Instance.VerifyInstrumentedProcedures(prog);
             } else { 
-                (new Utils.LoadAddressDecider()).Visit(prog);
-                addressRegionDB = Utils.VCSplitter.Instance.VerifyInstrumentedProcedures(prog);
+                (new LoadAddressDecider()).Visit(prog);
+                addressRegionDB = VCSplitter.Instance.VerifyInstrumentedProcedures(prog);
             }
 
             Options.splitMemoryModel = old_option;
@@ -92,17 +92,17 @@ namespace CfiVerifier
             Dictionary<Tuple<string, Cmd, AssertCmd>, bool> storeAddressRegionDB, 
             Dictionary<Tuple<string, Cmd, AssertCmd>, bool>  loadAddressRegionDB )
         {
-            (new Utils.SpecialInstructionLifter()).Visit(prog);
+            (new SpecialInstructionLifter()).Visit(prog);
             Utils.PrintProg(prog);
-            if (Options.splitMemoryModel) { (new Utils.SplitMemoryModeler(storeAddressRegionDB, loadAddressRegionDB)).Visit(prog); }
+            if (Options.splitMemoryModel) { (new SplitMemoryModeler(storeAddressRegionDB, loadAddressRegionDB)).Visit(prog); }
             Utils.PrintProg(prog);
-            (new Utils.ModularVerificationSetup()).Visit(prog);
+            (new ModularVerificationSetup()).Visit(prog);
             Utils.PrintProg(prog);
             //(new Utils.DeadCodeEliminator()).Visit(prog); //mostly to remove assingments to useless CPU flags
 
             //if (Utils.verbosityLevel(2)) { Console.WriteLine("InstrumentEnclave: replacing call instructions with CallCmd"); }
             // (new Utils.HavocingAdversary()).Visit(impl); //FIXME: this should be enabled.
-            Utils.LoopDetector loopDetector = new Utils.LoopDetector();
+            LoopDetector loopDetector = new LoopDetector();
             loopDetector.Visit(impl); //necessary before querying the stack size estimate
             List<Block> blocksInNaturalLoops = loopDetector.getBlocksInNaturalLoops();
             if (blocksInNaturalLoops.Count > 0)
@@ -121,13 +121,13 @@ namespace CfiVerifier
                 Utils.InstrumentLoopInvariant(prog, impl, memCheckpointLabel, loopHeaderLabels);
             }
 
-            Utils.VCSplitter.LaunchVCSplitter(impl);
+            VCSplitter.LaunchVCSplitter(impl);
 
-            (new Utils.EnvironmentSetup()).Visit(prog); //TODO move this earlier, maybe before DeadCodeEliminator
-            (new Utils.TypeChecker()).Visit(prog);
+            (new EnvironmentSetup()).Visit(prog); //TODO move this earlier, maybe before DeadCodeEliminator
+            (new ProofObligations()).Visit(prog);
             Console.WriteLine("\nInstrumented Program with CFI assertions and generated output file {0}", Options.instrumentedFile);
             Utils.PrintProg(prog);
-            Utils.VCSplitter.Instance.PrintInstrumentedProcedures(prog);
+            VCSplitter.Instance.PrintInstrumentedProcedures(prog);
         }
 
     }
