@@ -159,44 +159,13 @@ namespace CfiDriver
             };
 
             var delim = Options.IsLinux() ? @"/" : @"\";
-            bool forNuno = false;
-            if (forNuno)
-            {
-                string args0 = @" " + directory + delim + @"split_" + i.ToString() + @"." + tag + ".bpl /timeLimit:" + Options.timeoutPerProcess;
-                string args1 = args0 + @" /proverLog:" + directory + delim + @"split_" + i.ToString() + @"." + "baseline" + ".z3" + @" /contractInfer /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0";
-                string args2 = args0 + @" /proverLog:" + directory + delim + @"split_" + i.ToString() + @"." + "tharray" + ".z3" + @" /typeEncoding:m /useArrayTheory";
-                Tuple<BoogieResult, int> args1_result = ExecuteBoogieBinary(args1);
-            }
-            else
-            {
-                string args0 = @" " + directory + delim + @"split_" + i.ToString() + @"." + tag + ".bpl /timeLimit:" + Options.timeoutPerProcess;
-                string args1 = args0 + @" /contractInfer /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0";
-                //string args2 = args0 + @" /typeEncoding:m /useArrayTheory";
-                Tuple<BoogieResult, int> args1_result = ExecuteBoogieBinary(args1);
-                RegisterResult(directory, tag, i, foundLoops, 1, args1_result.Item1, args1_result.Item2);
-            }
 
-          /* //Seems like args2 very rarely gives VERIFIED when args1 gives ERROR/UNKNOWN. This happened 4 / ~10000 times. Not worth it.
-            if (args1_result.Item1 == BoogieResult.VERIFIED)
-            {
-              RegisterResult(directory, tag, i, foundLoops, 1, BoogieResult.VERIFIED, args1_result.Item2);
-            }
-            //if ERROR or UNKNOWN, try another run with no options. Sometimes this gives a proof!
-            else
-            {
-              Tuple<BoogieResult, int> args2_result = ExecuteBoogieBinary(args2);
-              if (args2_result.Item1 == BoogieResult.VERIFIED)
-              {
-                RegisterResult(directory, tag, i, foundLoops, 2, BoogieResult.VERIFIED, args2_result.Item2);
-              }
-              else
-              {
-                //BoogieResult args0_result = ExecuteBoogieBinary(args0);
-                //RegisterResult(directory, tag, i, join(args0_result, join(args1_result, args2_result)));
-                RegisterResult(directory, tag, i, foundLoops, 2, join(args1_result.Item1, args2_result.Item1), Math.Max(args1_result.Item2, args2_result.Item2));
-              }
-            }
-          */
+            string args0 = @" " + directory + delim + @"split_" + i.ToString() + @"." + tag + ".bpl /timeLimit:" + Options.timeoutPerProcess;
+            string args1 = args0 + @" /contractInfer /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0";
+            //string args2 = args0 + @" /typeEncoding:m /useArrayTheory";
+            Tuple<BoogieResult, int> args1_result = ExecuteBoogieBinary(args1);
+            RegisterResult(directory, tag, i, foundLoops, 1, args1_result.Item1, args1_result.Item2);
+
         }
 
         private static Tuple<BoogieResult, int> ExecuteBoogieBinary(string arguments)
