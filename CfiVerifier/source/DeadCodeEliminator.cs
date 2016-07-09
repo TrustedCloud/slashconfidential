@@ -19,7 +19,9 @@ namespace CfiVerifier
     {
         private GlobalVariable mem, mem_bitmap, mem_stack;
         private GlobalVariable R8, R9, RAX, RCX, RDX, R10, R11, RBX, RBP, RDI, RSI, RSP, R12, R13, R14, R15;
-        //private GlobalVariable AF, CF, OF, PF, SF, ZF;
+
+        List<Variable> allVars;
+        List<Variable> functionArgVars;
 
         public LiveVariableAnalyzer(Program node)
         {
@@ -32,50 +34,32 @@ namespace CfiVerifier
                 this.mem_bitmap = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("mem_bitmap"));
                 Utils.Assert(this.mem_bitmap != null, "Could not find mem_bitmap variable");
             }
-            this.R8 = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("R8"));
-            Utils.Assert(this.R8 != null, "Could not find R8 variable");
-            this.R9 = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("R9"));
-            Utils.Assert(this.R9 != null, "Could not find R9 variable");
-            this.RAX = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("RAX"));
-            Utils.Assert(this.RAX != null, "Could not find RAX variable");
-            this.RCX = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("RCX"));
-            Utils.Assert(this.RCX != null, "Could not find RCX variable");
-            this.RDX = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("RDX"));
-            Utils.Assert(this.RDX != null, "Could not find RDX variable");
-            this.R10 = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("R10"));
-            Utils.Assert(this.R10 != null, "Could not find R10 variable");
-            this.R11 = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("R11"));
-            Utils.Assert(this.R11 != null, "Could not find R11 variable");
-            this.RBX = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("RBX"));
-            Utils.Assert(this.RBX != null, "Could not find RBX variable");
-            this.RBP = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("RBP"));
-            Utils.Assert(this.RBP != null, "Could not find RBP variable");
-            this.RDI = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("RDI"));
-            Utils.Assert(this.RDI != null, "Could not find RDI variable");
-            this.RSI = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("RSI"));
-            Utils.Assert(this.RSI != null, "Could not find RSI variable");
-            this.RSP = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("RSP"));
-            Utils.Assert(this.RSP != null, "Could not find RSP variable");
-            this.R12 = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("R12"));
-            Utils.Assert(this.R12 != null, "Could not find R12 variable");
-            this.R13 = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("R13"));
-            Utils.Assert(this.R13 != null, "Could not find R13 variable");
-            this.R14 = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("R14"));
-            Utils.Assert(this.R14 != null, "Could not find R14 variable");
-            this.R15 = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("R15"));
-            Utils.Assert(this.R15 != null, "Could not find R15 variable");
-            //this.AF = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("AF"));
-            //Utils.Assert(this.AF != null, "Could not find AF variable");
-            //this.CF = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("CF"));
-            //Utils.Assert(this.CF != null, "Could not find CF variable");
-            //this.OF = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("OF"));
-            //Utils.Assert(this.OF != null, "Could not find OF variable");
-            //this.PF = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("PF"));
-            //Utils.Assert(this.PF != null, "Could not find PF variable");
-            //this.SF = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("SF"));
-            //Utils.Assert(this.SF != null, "Could not find SF variable");
-            //this.ZF = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("ZF"));
-            //Utils.Assert(this.ZF != null, "Could not find ZF variable");
+
+            this.R8 = Utils.FindGlobalVariableInProgram(node, "R8");
+            this.R9 = Utils.FindGlobalVariableInProgram(node, "R9");
+            this.R10 = Utils.FindGlobalVariableInProgram(node, "R10");
+            this.R11 = Utils.FindGlobalVariableInProgram(node, "R11");
+            this.R12 = Utils.FindGlobalVariableInProgram(node, "R12");
+            this.R13 = Utils.FindGlobalVariableInProgram(node, "R13");
+            this.R14 = Utils.FindGlobalVariableInProgram(node, "R14");
+            this.R15 = Utils.FindGlobalVariableInProgram(node, "R15");
+            this.RAX = Utils.FindGlobalVariableInProgram(node, "RAX");
+            this.RCX = Utils.FindGlobalVariableInProgram(node, "RCX");
+            this.RDX = Utils.FindGlobalVariableInProgram(node, "RDX");
+            this.RBX = Utils.FindGlobalVariableInProgram(node, "RBX");
+            this.RBP = Utils.FindGlobalVariableInProgram(node, "RBP");
+            this.RDI = Utils.FindGlobalVariableInProgram(node, "RDI");
+            this.RSI = Utils.FindGlobalVariableInProgram(node, "RSI");
+            this.RSP = Utils.FindGlobalVariableInProgram(node, "RSP");
+
+            //return nodes should have all state variables
+            this.allVars = new List<Variable>() { R8, R9, RAX, RCX, RDX, R10, R11, RBX, RBP, RDI, RSI, RSP, R12, R13, R14, R15, mem };
+            this.functionArgVars = new List<Variable>() { this.RCX, this.RDX, this.R8, this.R9, this.mem };
+
+            if (Options.splitMemoryModel) {
+                this.functionArgVars.AddRange(new List<Variable>() { this.mem_bitmap, this.mem_stack });
+                this.allVars.AddRange(new List<Variable>() { this.mem_bitmap, this.mem_stack }); 
+            }
         }
 
         public static Dictionary<Block, HashSet<Block>> buildSuccessorRelation(Implementation impl)
@@ -132,9 +116,7 @@ namespace CfiVerifier
                     else if (c is CallCmd)
                     {
                         //Windows calling convention uses RCX,RDX,R8,R9, and mem for passing inputs
-                        in_live = Options.splitMemoryModel ?
-                            in_live.Union(new List<Variable>() { this.RCX, this.RDX, this.R8, this.R9, this.mem, this.mem_bitmap, this.mem_stack }).ToList() :
-                            in_live.Union(new List<Variable>() { this.RCX, this.RDX, this.R8, this.R9, this.mem }).ToList();
+                        in_live = in_live.Union(this.functionArgVars).ToList();
 
                     }
 
@@ -178,10 +160,7 @@ namespace CfiVerifier
 
             //empty live variable sets to start with: for i = 1 to n do live[i] := {}
             foreach (Block b in impl.Blocks) { live.Add(b, new List<Variable>()); }
-            //return nodes should have all state variables
-            List<Variable> allVars = Options.splitMemoryModel ?
-                new List<Variable>() { R8, R9, RAX, RCX, RDX, R10, R11, RBX, RBP, RDI, RSI, RSP, R12, R13, R14, R15, mem, mem_bitmap, mem_stack } :
-                new List<Variable>() { R8, R9, RAX, RCX, RDX, R10, R11, RBX, RBP, RDI, RSI, RSP, R12, R13, R14, R15, mem };
+            
 
             //first compute live vars at the block granularity (for efficiency)
             bool live_changes = true;
