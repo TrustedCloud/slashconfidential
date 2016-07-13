@@ -57,6 +57,11 @@ namespace CfiDriver
           //item1 = benchmarks\StackExample\func_0000000000001000, item2 = dllfunc.bpl, item3 = "", item4 = "baseline"
           var delim = Options.IsLinux() ? @"/" : @"\";
           int numVerified = 0, numError = 0, numUnknown = 0;
+          if (splitMemory)
+          {
+              optimizeLoad = true;
+              optimizeStore = true;
+          }
 
           foreach (Tuple<string, string, string, string> benchmark in benchmarks)
           {
