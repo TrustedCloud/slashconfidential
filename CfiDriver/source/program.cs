@@ -16,8 +16,11 @@ namespace CfiDriver
     /// </summary>
   class CfiDriver
     {
-        enum BoogieResult { VERIFIED, ERROR, UNKNOWN }; 
+        enum BoogieResult { VERIFIED, ERROR, UNKNOWN };
 
+        static bool verbose = false;
+        static string resultFileName = @"ResultSummary_" + DateTime.Now.Hour.ToString() + "_" 
+            + DateTime.Now.Minute.ToString() + "_" + DateTime.Now.Second.ToString() + ".txt";
         static Dictionary<string, List<Tuple<string,int,bool,int,BoogieResult,int>>> results; //dir -> result
         static List<Tuple<string, string, string, string>> benchmarks; //<directory, input bpl, options, run_type_name>
 
@@ -48,8 +51,7 @@ namespace CfiDriver
                 args.Contains("/option:optimizestore"),
                 args.Contains("/option:optimizeload"));
 
-            var dateString = DateTime.Now.Hour.ToString() + "_" + DateTime.Now.Minute.ToString() + "_" + DateTime.Now.Second.ToString();
-            GenerateResultOutput(@"CfiResultsSummary_" + dateString + ".txt", stats);
+            GenerateResultOutput(resultFileName, stats);
         }
 
         public static Tuple<int, int, int> RunBenchmarks(List<Tuple<string, string, string, string>> benchmarks, bool doNotRunBenchmarks, bool splitMemory, bool optimizeStore, bool optimizeLoad)
@@ -87,7 +89,8 @@ namespace CfiDriver
               bool foundLoops = result.Item2;
               if (numAssertions < 0)
               {
-                  throw new Exception("Benchmark " + benchmark.Item1 + " did not generate any assertions");
+                  Console.WriteLine("Benchmark " + benchmark.Item1 + " did not generate any assertions");
+                  continue;
               }
               Console.WriteLine("\tFOUND {0} assertions in benchmark {1}, Running them in parallel...", numAssertions, benchmark.Item1);
               if (!doNotRunBenchmarks) { CheckAssertionsInParallel(benchmark.Item1, benchmark.Item4, numAssertions, foundLoops); }
@@ -112,6 +115,7 @@ namespace CfiDriver
               }
               Tuple<int, int, int> stats = ComputeStatisticsForDirectory(benchmark.Item1, result.Item3);
               numVerified += stats.Item1; numError += stats.Item2; numUnknown += stats.Item3;
+              EmitBenchmarkResults(resultFileName ,benchmark.Item1);
           }
 
           return new Tuple<int, int, int>(numVerified, numError, numUnknown);
@@ -218,7 +222,8 @@ namespace CfiDriver
             return BoogieResult.UNKNOWN;
           };
 
-          Console.WriteLine("\tSTART Executing {0} {1}", binaryName, arguments);
+          if (verbose)
+            Console.WriteLine("\tSTART Executing {0} {1}", binaryName, arguments);
           try
           {
             ProcessStartInfo procInfo = new ProcessStartInfo();
@@ -236,7 +241,8 @@ namespace CfiDriver
             string output = "";
             output = proc.StandardOutput.ReadToEnd();
             proc.WaitForExit();
-            Console.WriteLine("\tEND Executing {0} {1}", binaryName, arguments);
+            if (verbose)
+                Console.WriteLine("\tEND Executing {0} {1}", binaryName, arguments);
             return new Tuple<BoogieResult, int>(result(output), sw.Elapsed.Minutes * 60 + sw.Elapsed.Seconds);
           }
           catch (Exception e)
@@ -343,25 +349,29 @@ namespace CfiDriver
           results[directory].Add(Tuple.Create(tag, i, foundLoops, option, result, timeInSeconds));
         }
 
+        private static void EmitBenchmarkResults(string resultFileName, string directory)
+        {
+            TextWriter tw = new StreamWriter(resultFileName, true);
+            List<Tuple<string, int, bool, int, BoogieResult, int>> entries = results[directory].OrderBy(x => x.Item2).ToList();
+            foreach (Tuple<string, int, bool, int, BoogieResult, int> entry in entries)
+            {
+                tw.WriteLine(directory + "<" + entry.Item1 + "," + entry.Item2.ToString() + "> :" +
+                    entry.Item5 + (entry.Item3 ? "[LOOP]" : "") + ("[option:" + entry.Item4 + "]") + ("[time:" + entry.Item6 + "]"));
+            }
+            tw.Flush();
+            tw.Close();
+        }
+
         private static void GenerateResultOutput(string resultFileName, Tuple<int,int,int> stats)
         {
           Dictionary<string,int> sum = new Dictionary<string,int>();
-          TextWriter output = new StreamWriter(resultFileName); 
+          TextWriter output = new StreamWriter(resultFileName, true); 
           foreach (string directory in results.Keys)
           {
             List<Tuple<string, int, bool, int, BoogieResult,int>> entries = results[directory].OrderBy(x => x.Item2).ToList();
             foreach (Tuple<string, int, bool, int, BoogieResult,int> entry in entries)
             {
-              output.WriteLine(directory + "<" + entry.Item1 + "," + entry.Item2.ToString() + "> : " +
-                  entry.Item5 + (entry.Item3 ? "[LOOP]" : "") + ("[option:" + entry.Item4 + "]") + ("[time:" + entry.Item6 + "]"));
-              if (!sum.ContainsKey(entry.Item1))
-              {
-                sum[entry.Item1] = entry.Item6;
-              }
-              else
-              {
-                sum[entry.Item1] += entry.Item6;
-              }
+                sum[entry.Item1] = !sum.ContainsKey(entry.Item1) ? entry.Item6 : sum[entry.Item1] + entry.Item6;
             }
           }
           foreach (string s in sum.Keys)
