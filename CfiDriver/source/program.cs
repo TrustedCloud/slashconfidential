@@ -18,7 +18,7 @@ namespace CfiDriver
     {
         enum BoogieResult { VERIFIED, ERROR, UNKNOWN };
 
-        static bool verbose = false;
+        static bool verbose = true;
         static string resultFileName = @"ResultSummary_" + DateTime.Now.Hour.ToString() + "_" 
             + DateTime.Now.Minute.ToString() + "_" + DateTime.Now.Second.ToString() + ".txt";
         static Dictionary<string, List<Tuple<string,int,bool,int,BoogieResult,int>>> results; //dir -> result
@@ -101,7 +101,7 @@ namespace CfiDriver
                   {
                       string boogie_args = @" " + benchmark.Item1 + delim + @"split_" + i.ToString() + @"." + 
                           benchmark.Item4 + ".bpl /timeLimit:" + Options.timeoutPerProcess + 
-                          @" /contractInfer /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0";
+                          @" /contractInfer /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0 /errorLimit:1";
                       string boogie_bin = @"." + delim + "references" + delim + "Boogie.exe";
                       output.WriteLine(boogie_bin + boogie_args);
                   }
@@ -179,7 +179,7 @@ namespace CfiDriver
             else
             {
                 string args0 = @" " + directory + delim + @"split_" + i.ToString() + @"." + tag + ".bpl /timeLimit:" + Options.timeoutPerProcess;
-                string args1 = args0 + @" /contractInfer /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0";
+                string args1 = args0 + @" /contractInfer /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0 /errorLimit:1";
                 //string args2 = args0 + @" /typeEncoding:m /useArrayTheory";
                 Tuple<BoogieResult, int> args1_result = ExecuteBoogieBinary(args1);
                 RegisterResult(directory, tag, i, foundLoops, 1, args1_result.Item1, args1_result.Item2);

@@ -2186,7 +2186,7 @@ namespace CfiVerifier
 
           private void CheckAssertion(int i)
           {
-              string args = Options.outputPath + @"/" + Options.splitFilesDir + @"/intermediate_" + i.ToString() + ".bpl /timeLimit:10 /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0";
+              string args = Options.outputPath + @"/" + Options.splitFilesDir + @"/intermediate_" + i.ToString() + ".bpl /timeLimit:10 /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0 /errorLimit:1";
               bool boogie_result = ExecuteBoogieBinary(args);
               shared_result_struct.Add(i, boogie_result);
           }
