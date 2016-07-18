@@ -2186,7 +2186,7 @@ namespace CfiVerifier
 
           private void CheckAssertion(int i)
           {
-              string args = Options.outputPath + @"/" + Options.splitFilesDir + @"/intermediate_" + i.ToString() + ".bpl /timeLimit:300 /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0";
+              string args = Options.outputPath + @"/" + Options.splitFilesDir + @"/intermediate_" + i.ToString() + ".bpl /timeLimit:10 /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0";
               bool boogie_result = ExecuteBoogieBinary(args);
               shared_result_struct.Add(i, boogie_result);
           }
@@ -2368,15 +2368,22 @@ namespace CfiVerifier
                     this.live_set[prev_cmd].UnionWith(this.live_set[this_cmd]);
                     if (as_assign_cmd != null) 
                     {
-                        HashSet<Variable> assign_cmd_lhs_vars = GetReferencedVars(as_assign_cmd.Lhss.First().AsExpr);
-                        this.live_set[prev_cmd] = new HashSet<Variable>(this.live_set[prev_cmd].Except(assign_cmd_lhs_vars).ToList());
-                        if (this.live_set[this_cmd].Contains(assign_cmd_lhs_vars.First())) 
+                        Utils.Assert(as_assign_cmd.Lhss.Count == 1);
+                        Variable assign_cmd_lhs_var = GetReferencedVars(as_assign_cmd.Lhss.First().AsExpr).First();
+                        HashSet<Variable> assign_cmd_rhs_vars = new HashSet<Variable>();
+                        this.live_set[prev_cmd].Remove(assign_cmd_lhs_var);
+                        foreach (Expr rhs_expr in as_assign_cmd.Rhss) 
                         {
-                            foreach (Expr rhs_expr in as_assign_cmd.Rhss) 
-                            {
-                                this.live_set[prev_cmd].UnionWith(GetReferencedVars(rhs_expr));
-                                this.keep_set.Add(prev_cmd);
-                            }
+                            assign_cmd_rhs_vars.UnionWith(GetReferencedVars(rhs_expr));
+                        }
+                        if (this.live_set[this_cmd].Contains(assign_cmd_lhs_var)) 
+                        {
+                            this.live_set[prev_cmd].UnionWith(assign_cmd_rhs_vars);
+                            this.keep_set.Add(prev_cmd);
+                        }
+                        if (assign_cmd_rhs_vars.Contains(assign_cmd_lhs_var))
+                        {
+                            this.live_set[prev_cmd].Add(assign_cmd_lhs_var);
                         }
                     }
                     if (prev_cmd is AssumeCmd) 
@@ -2384,7 +2391,9 @@ namespace CfiVerifier
                         this.live_set[prev_cmd].UnionWith(GetReferencedVars(prev_cmd));
                         this.keep_set.Add(prev_cmd);
                     }
+                    Utils.Assert(this.live_set[prev_cmd].Count >= size_before);
                     if (this.live_set[prev_cmd].Count > size_before || this.keep_set.Contains(prev_cmd) != keep_before) {
+                        //Console.WriteLine("Changing {0} -- {1}.", this_cmd.ToString(), prev_cmd.ToString());
                         changed = true;
                     }
                 }
@@ -2438,6 +2447,7 @@ namespace CfiVerifier
                 else if (e is ForallExpr)
                 {
                     referenced_vars.UnionWith(GetReferencedVars((e as ForallExpr).Body));
+                    (e as ForallExpr).Dummies.ForEach(i => referenced_vars.Remove(i));
                 }
                 return referenced_vars;
             }
