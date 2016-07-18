@@ -19,7 +19,7 @@ namespace CfiVerifier
     public class VCSplitter : StandardVisitor
     {
         private static VCSplitter instance;
-        private static List<Tuple<string, Cmd, AssertCmd>> assertions;
+        private static List<Tuple<string, Cmd, AssertCmd, SlashVerifyCmdType>> assertions;
         private static Implementation original_impl;
 
         private string current_label; //ugly hack of using global
@@ -33,7 +33,7 @@ namespace CfiVerifier
         public static void LaunchVCSplitter(Implementation impl)
         {
             instance = new VCSplitter();
-            assertions = new List<Tuple<string, Cmd, AssertCmd>>();
+            assertions = new List<Tuple<string, Cmd, AssertCmd, SlashVerifyCmdType>>();
             original_impl = new Duplicator().VisitImplementation(impl);
         }
 
@@ -92,10 +92,10 @@ namespace CfiVerifier
             return false;
         }
 
-        public void RecordAssertion(string label, Cmd typedCmd, AssertCmd assertion)
+        public void RecordAssertion(string label, Cmd typedCmd, AssertCmd assertion, SlashVerifyCmdType cmdType)
         {
             if (!Options.splitFiles) { return; }
-            assertions.Add(new Tuple<string, Cmd, AssertCmd>(label, typedCmd, assertion));
+            assertions.Add(new Tuple<string, Cmd, AssertCmd, SlashVerifyCmdType>(label, typedCmd, assertion, cmdType));
         }
 
         public int getCurrentAssertionCount()
@@ -156,10 +156,10 @@ namespace CfiVerifier
         Dictionary<int, bool> shared_result_struct;
         public Dictionary<Tuple<string, Cmd, AssertCmd>, bool> VerifyInstrumentedProcedures(Program prog)
         {
-            Dictionary<Tuple<string, Cmd, AssertCmd>, int> intermediate = new Dictionary<Tuple<string, Cmd, AssertCmd>, int>();
+            Dictionary<Tuple<string, Cmd, AssertCmd, SlashVerifyCmdType>, int> intermediate = new Dictionary<Tuple<string, Cmd, AssertCmd, SlashVerifyCmdType>, int>();
             Dictionary<Tuple<string, Cmd, AssertCmd>, bool> result = new Dictionary<Tuple<string, Cmd, AssertCmd>, bool>();
             int numAssertions = 0;
-            foreach (Tuple<string, Cmd, AssertCmd> assertion in assertions)
+            foreach (Tuple<string, Cmd, AssertCmd, SlashVerifyCmdType> assertion in assertions)
             {
                 var filename = Options.outputPath + @"/" + Options.splitFilesDir + @"/intermediate_" + numAssertions.ToString() + ".bpl";
                 var tuo = new TokenTextWriter(filename);
@@ -188,9 +188,10 @@ namespace CfiVerifier
 
             shared_result_struct = new Dictionary<int, bool>();
             Parallel.For(0, numAssertions, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, i => CheckAssertion(i));
-            foreach (Tuple<string, Cmd, AssertCmd> assertion in assertions)
+            foreach (Tuple<string, Cmd, AssertCmd, SlashVerifyCmdType> assertion in assertions)
             {
-                result[assertion] = shared_result_struct[intermediate[assertion]];
+                result[new Tuple<string, Cmd, AssertCmd>(assertion.Item1, assertion.Item2, assertion.Item3)] = 
+                    shared_result_struct[intermediate[assertion]];
             }
             return result;
         }
@@ -202,12 +203,45 @@ namespace CfiVerifier
             shared_result_struct.Add(i, boogie_result);
         }
 
+        public void PrintAssertionTypes()
+        {
+            Func<SlashVerifyCmdType, String> printCmdType = delegate(SlashVerifyCmdType x)
+            {
+                switch (x)
+                {
+                    case SlashVerifyCmdType.Load8: { return "LOAD8"; }
+                    case SlashVerifyCmdType.Load16: { return "LOAD16"; }
+                    case SlashVerifyCmdType.Load32: { return "LOAD32"; }
+                    case SlashVerifyCmdType.Load64: { return "LOAD64"; }
+                    case SlashVerifyCmdType.Store8: { return "STORE8"; }
+                    case SlashVerifyCmdType.Store16: { return "STORE16"; }
+                    case SlashVerifyCmdType.Store32: { return "STORE32"; }
+                    case SlashVerifyCmdType.Store64: { return "STORE64"; }
+                    case SlashVerifyCmdType.Call: { return "CALL"; }
+                    case SlashVerifyCmdType.Jmp: { return "JMP"; }
+                    case SlashVerifyCmdType.RemoteJmp: { return "REMOTEJMP"; }
+                    case SlashVerifyCmdType.RepStosB: { return "REPSTOSB"; }
+                    case SlashVerifyCmdType.Ret: { return "RET"; }
+                    case SlashVerifyCmdType.SetRSP: { return "SETRSP"; }
+                    default: { return "INVALID"; }
+                }
+            };
+
+            int assertionCounter = 0;
+            foreach (Tuple<string, Cmd, AssertCmd, SlashVerifyCmdType> assertion in assertions)
+            {
+
+                Console.Write("VCSplitter found split id " + assertionCounter + " with type " + printCmdType(assertion.Item4) );
+                assertionCounter++;
+            }
+        }
+
         public void PrintInstrumentedProcedures(Program prog)
         {
             if (!Options.splitFiles) { return; }
 
             int impl_counter = 0;
-            foreach (Tuple<string, Cmd, AssertCmd> assertion in assertions)
+            foreach (Tuple<string, Cmd, AssertCmd, SlashVerifyCmdType> assertion in assertions)
             {
                 string tag = Options.tag != "" ? @"." + Options.tag : "";
                 var filename = Options.outputPath + @"/" + Options.splitFilesDir + @"/split_" + impl_counter.ToString() + tag + @".bpl";

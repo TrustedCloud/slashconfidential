@@ -16,6 +16,20 @@ using BType = Microsoft.Boogie.Type;
 
 namespace CfiVerifier
 {
+
+    public enum SlashVerifyCmdType
+    {
+        None,
+        Load8, Load16, Load32, Load64,
+        Store8, Store16, Store32, Store64,
+        RepStosB,
+        Call,
+        Ret,
+        Jmp,
+        SetRSP,
+        RemoteJmp
+    };
+
     static class Utils
     {
 
@@ -100,8 +114,7 @@ namespace CfiVerifier
             return c;
         }
 
-        #region AssignCmd classifiers
-        public enum SlashVerifyCmdType { None, Load8, Load16, Load32, Load64, Store8, Store16, Store32, Store64, RepStosB };
+
         /* looks at the function used in the NAryExpr to determine the type: LOAD8, LOAD16,...,STORE64 */
         public static SlashVerifyCmdType getSlashVerifyCmdType(AssignCmd c)
         {
@@ -180,7 +193,6 @@ namespace CfiVerifier
                 ((NAryExpr) rhs).Args[2],
                 ((NAryExpr) rhs).Args[3]);
         }
-        #endregion
 
         #region recursive utilities for Expr
         public static List<Variable> getNestedVars(Expr e)

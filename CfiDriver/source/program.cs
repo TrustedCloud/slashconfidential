@@ -10,15 +10,14 @@ using System.Threading.Tasks;
 
 namespace CfiDriver
 {
-    /// <summary>
-    /// This module runs rootcause.exe as a black box on a set of directories, with various options and 
-    /// generates a HTML report of the results
-    /// </summary>
+
   class CfiDriver
     {
-        enum BoogieResult { VERIFIED, ERROR, UNKNOWN }; 
+        enum BoogieResult { VERIFIED, ERROR, UNKNOWN };
 
-        static Dictionary<string, List<Tuple<string,int,bool,int,BoogieResult,int>>> results; //dir -> result
+        //key: directory, value: [tag, splitId, attributes, boogieResult, timeInSeconds]
+        static Dictionary<string, List<Tuple<string,int,ProgramAttributes,BoogieResult,int>>> results;
+
         static List<Tuple<string, string, string, string>> benchmarks; //<directory, input bpl, options, run_type_name>
 
         private void Usage()
@@ -29,7 +28,7 @@ namespace CfiDriver
         static void Main(string[] args)
         {
             Console.WriteLine("Environment has {0} processors", Environment.ProcessorCount);
-            results = new Dictionary<string, List<Tuple<string,int,bool,int,BoogieResult,int>>>();
+            results = new Dictionary<string, List<Tuple<string, int, ProgramAttributes, BoogieResult, int>>>();
             benchmarks = new List<Tuple<string, string, string, string>>();
 
             //all benchmark options should be in options.cs to avoid changes to this file except for logic changes
@@ -58,6 +57,7 @@ namespace CfiDriver
           var delim = Options.IsLinux() ? @"/" : @"\";
           int numVerified = 0, numError = 0, numUnknown = 0;
 
+          //item1: directory, item2: bpl file, item3: options, item4: tag
           foreach (Tuple<string, string, string, string> benchmark in benchmarks)
           {
               if (!Directory.Exists(benchmark.Item1))
@@ -77,77 +77,59 @@ namespace CfiDriver
               if (splitMemory) { args += @" /splitMemoryModel+"; }
               if (optimizeStore) { args += @" /optimizeStoreITE+"; }
               if (optimizeLoad) { args += @" /optimizeLoadITE+"; }
-              Tuple<int, bool, List<Tuple<int, int>>> result = ExecuteCfiVerifierBinary(args);
-              int numAssertions = result.Item1;
-              bool foundLoops = result.Item2;
-              if (numAssertions < 0)
+              ProgramAttributes attributes = ExecuteCfiVerifierBinary(args);
+
+              if (attributes.numSplits < 0)
               {
                   throw new Exception("Benchmark " + benchmark.Item1 + " did not generate any assertions");
               }
-              Console.WriteLine("\tFOUND {0} assertions in benchmark {1}, Running them in parallel...", numAssertions, benchmark.Item1);
-              if (!doNotRunBenchmarks) { CheckAssertionsInParallel(benchmark.Item1, benchmark.Item4, numAssertions, foundLoops); }
+              Console.WriteLine("\tFOUND {0} assertions in benchmark {1}, Running them in parallel...", 
+                  attributes.numSplits, 
+                  benchmark.Item1);
+              if (!doNotRunBenchmarks) { CheckAssertionsInParallel(benchmark.Item1, benchmark.Item4, attributes); }
 
+              // generate a script in case we want to run benchmarks later manually
+              TextWriter fileWriter = new StreamWriter("script");
+              for (int i = 0; i < attributes.numSplits; i++)
               {
-                  TextWriter output = new StreamWriter("script");
-                  for (int i = 0; i < numAssertions; i++)
-                  {
-                      string boogie_args = @" " + benchmark.Item1 + delim + @"split_" + i.ToString() + @"." + 
-                          benchmark.Item4 + ".bpl /timeLimit:" + Options.timeoutPerProcess + 
-                          @" /contractInfer /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0";
-                      string boogie_bin = @"." + delim + "references" + delim + "Boogie.exe";
-                      output.WriteLine(boogie_bin + boogie_args);
-                  }
-                  output.Flush();
-                  output.Close();
+                  string boogie_args = @" " + benchmark.Item1 + delim + @"split_" + i.ToString() + @"." + 
+                      benchmark.Item4 + ".bpl /timeLimit:" + Options.timeoutPerProcess + 
+                      @" /contractInfer /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0";
+                  string boogie_bin = @"." + delim + "references" + delim + "Boogie.exe";
+                  fileWriter.WriteLine(boogie_bin + boogie_args);
               }
+              fileWriter.Flush();
+              fileWriter.Close();
 
-              foreach (Tuple<int, int> t in result.Item3)
-              {
-                  Console.WriteLine("\tFOUND grouped assertions: ({0},{1})", t.Item1, t.Item2);
-              }
-              Tuple<int, int, int> stats = ComputeStatisticsForDirectory(benchmark.Item1, result.Item3);
+              Tuple<int, int, int> stats = ComputeStatisticsForDirectory(benchmark.Item1);
               numVerified += stats.Item1; numError += stats.Item2; numUnknown += stats.Item3;
           }
 
           return new Tuple<int, int, int>(numVerified, numError, numUnknown);
         }
 
-        private static Tuple<int, int, int> ComputeStatisticsForDirectory(string directory, List<Tuple<int,int>> mergedAsserts)
+        private static Tuple<int, int, int> ComputeStatisticsForDirectory(string directory)
         {
             // results[directory].Add(Tuple.Create(tag, i, foundLoops, option, result, timeInSeconds));
             int numVerified = 0, numError = 0, numUnknown = 0;
-            BoogieResult mergedAssertResult = BoogieResult.VERIFIED;
             if (!results.ContainsKey(directory)) { return new Tuple<int, int, int>(0, 0, 0); }
-            foreach (Tuple<string, int, bool, int, BoogieResult, int> t in results[directory])
+            foreach (Tuple<string, int, ProgramAttributes, BoogieResult, int> t in results[directory])
             {
-                bool isMergedAssert = mergedAsserts.Any(x => t.Item2 >= x.Item1 && t.Item2 <= x.Item2);
-                if (!isMergedAssert)
-                {
-                    if (t.Item5 == BoogieResult.VERIFIED) { numVerified++; }
-                    if (t.Item5 == BoogieResult.ERROR) { numError++; }
-                    if (t.Item5 == BoogieResult.UNKNOWN) { numUnknown++; }
-                }
-                else
-                {
-                    if (mergedAssertResult == BoogieResult.ERROR) { mergedAssertResult = BoogieResult.ERROR; }
-                    else if (mergedAssertResult == BoogieResult.UNKNOWN && t.Item5 == BoogieResult.ERROR) { mergedAssertResult = BoogieResult.ERROR; }
-                    else if (mergedAssertResult == BoogieResult.VERIFIED && t.Item5 == BoogieResult.UNKNOWN) { mergedAssertResult = BoogieResult.UNKNOWN; }
-                    else if (mergedAssertResult == BoogieResult.VERIFIED && t.Item5 == BoogieResult.ERROR) { mergedAssertResult = BoogieResult.ERROR; }
-                }
+              if (t.Item4 == BoogieResult.VERIFIED) { numVerified++; }
+              if (t.Item4 == BoogieResult.ERROR) { numError++; }
+              if (t.Item4 == BoogieResult.UNKNOWN) { numUnknown++; }
             }
-            if (mergedAssertResult == BoogieResult.VERIFIED) { return new Tuple<int, int, int>(numVerified + 1, numError, numUnknown); }
-            else if (mergedAssertResult == BoogieResult.ERROR) { return new Tuple<int, int, int>(numVerified, numError + 1, numUnknown); }
-            else { return new Tuple<int, int, int>(numVerified, numError, numUnknown + 1); }
+            return new Tuple<int, int, int>(numVerified, numError, numUnknown);
         }
 
-        private static void CheckAssertionsInParallel(string directory, string tag, int numAssertions, bool foundLoops)
+        private static void CheckAssertionsInParallel(string directory, string tag, ProgramAttributes attributes)
         {
-            Parallel.For(0, numAssertions, 
+            Parallel.For(0, attributes.numSplits, 
               new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
-              i => CheckAssertion(directory, tag, i, foundLoops));
+              i => CheckAssertion(directory, tag, i, attributes));
         }
 
-        private static void CheckAssertion(string directory, string tag, int i, bool foundLoops)
+        private static void CheckAssertion(string directory, string tag, int splitId, ProgramAttributes attributes)
         {
             //join is commutative. join(VERIFIED,_) = VERIFIED. join(UNKNOWN,x) = x. join(ERROR,ERROR) = ERROR.
             Func<BoogieResult, BoogieResult, BoogieResult> join = delegate(BoogieResult r1, BoogieResult r2)
@@ -160,11 +142,13 @@ namespace CfiDriver
 
             var delim = Options.IsLinux() ? @"/" : @"\";
 
-            string args0 = @" " + directory + delim + @"split_" + i.ToString() + @"." + tag + ".bpl /timeLimit:" + Options.timeoutPerProcess;
+            string args0 = @" " + directory + delim + @"split_" + splitId.ToString() + @"." + tag + ".bpl /timeLimit:" + Options.timeoutPerProcess;
             string args1 = args0 + @" /contractInfer /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0";
             //string args2 = args0 + @" /typeEncoding:m /useArrayTheory";
+
+            //item1: error / unknown / verified, item2: time spent in boogie
             Tuple<BoogieResult, int> args1_result = ExecuteBoogieBinary(args1);
-            RegisterResult(directory, tag, i, foundLoops, 1, args1_result.Item1, args1_result.Item2);
+            RegisterResult(directory, tag, splitId, attributes, args1_result.Item1, args1_result.Item2);
 
         }
 
@@ -218,38 +202,66 @@ namespace CfiDriver
             var s = Options.IsLinux() ? @"/" : @"\";
             return path + @".."+s+".."+s+".."+s+"CfiVerifier"+s+"bin"+s+"Debug"+s;
         }
-        private static Tuple<int, bool, List<Tuple<int, int>>> ExecuteCfiVerifierBinary(string arguments)
+
+        public struct ProgramAttributes
+        {
+            public int numSplits;  //how many asserts do we have?
+            public bool foundLoop; //does this benchmark program contain a loop?
+            public Dictionary<int, String> assertionTypes; //what kind of statement does the assertion capture?
+            public int numBasicBlocks; //number of basic blocks
+        }
+
+        // first: number of assertions, second: found a loop
+        private static ProgramAttributes ExecuteCfiVerifierBinary(string arguments)
         {
             string binaryName = GetBinaryPath() + @"CfiVerifier.exe";
             //Func<string, string> ProcessOutput = delegate(string s) { return ("The number of lines in output = " + s.Split('\n').Count().ToString()); };
             Func<string, int> BenchmarkCount = delegate(string s)
             {
-              if (s.Contains("VCSplitter generated") && s.Contains("assertions"))
-              {
-                string countString = s.Split(new string[] { "VCSplitter generated " }, StringSplitOptions.None)[1].
-                                       Split(new string[] { " assertions" }, StringSplitOptions.None)[0];
-                return Int32.Parse(countString);
-              }
+                string HEADER = "VCSplitter generated ";
+                string BODY = " assertions";
 
-              return -1;
+                if (s.Contains(HEADER) && s.Contains(BODY))
+                {
+                  string countString = s.Split(new string[] { HEADER }, StringSplitOptions.None)[1].
+                                         Split(new string[] { BODY }, StringSplitOptions.None)[0];
+                  return Int32.Parse(countString);
+                }
+
+                return -1;
             };
 
             Func<string, bool> FoundLoop = delegate(string s)
             {
-              return (s.Contains("Found loop"));
+                return (s.Contains("CfiVerifier found one or more loops"));
             };
 
-            Func<string, List<Tuple<int, int>>> MergedAsserts = delegate(string s)
+            Func<string, int> BasicBlockCount = delegate(string s)
             {
-                List<Tuple<int, int>> result = new List<Tuple<int, int>>();
-                if (!s.Contains("VCSplitter says that ret produced assertions")) { return result; }
+                string HEADER = "CfiVerifier found ";
+                string BODY = " basic blocks";
 
-                foreach (string suffix in s.Split(new string[] { "\n" }, StringSplitOptions.None).
-                    Where(x => x.Contains("VCSplitter says that ret produced assertions")))
+                if (s.Contains(HEADER) && s.Contains(BODY))
                 {
-                    int start = Int32.Parse(suffix.Split(new String[] { "(" }, StringSplitOptions.None)[1].Split(new string[] { "," }, StringSplitOptions.None)[0]);
-                    int end = Int32.Parse(suffix.Split(new String[] { "," }, StringSplitOptions.None)[1].Split(new string[] { ")" }, StringSplitOptions.None)[0]);
-                    result.Add(new Tuple<int, int>(start,end));
+                    string countString = s.Split(new string[] { HEADER }, StringSplitOptions.None)[1].
+                                           Split(new string[] { BODY }, StringSplitOptions.None)[0];
+                    return Int32.Parse(countString);
+                }
+                return -1;
+            };
+
+            Func<string, Dictionary<int, String>> AssertionType = delegate(string input)
+            {
+                String HEADER = "VCSplitter found split id ";
+                String BODY = " with type ";
+                //Console.WriteLine(s);
+                Dictionary<int,string> result = new Dictionary<int, string>();
+                String[] splits = input.Split(new String[] { HEADER }, StringSplitOptions.None);
+                foreach (String s in splits) {
+                    if (!s.Contains(BODY)) { continue; }
+                    int splitId = Int32.Parse(s.Split(new String[] { BODY }, StringSplitOptions.None)[0]);
+                    string assertionType = s.Split(new String[] { BODY }, StringSplitOptions.None)[1];
+                    result.Add(splitId, assertionType);
                 }
                 return result;
             };
@@ -289,22 +301,39 @@ namespace CfiDriver
                 //}
                 #endregion 
                 Console.WriteLine("\tEND Executing {0} {1}", binaryName, arguments);
-                return new Tuple<int, bool, List<Tuple<int, int>>>(BenchmarkCount(output), FoundLoop(output), MergedAsserts(output));
+
+                ProgramAttributes attributes = new ProgramAttributes();
+                attributes.foundLoop = FoundLoop(output);
+                attributes.numSplits = BenchmarkCount(output);
+                attributes.assertionTypes = AssertionType(output);
+                attributes.numBasicBlocks = BasicBlockCount(output);
+
+                return attributes;
             }
             catch (Exception e)
             {
+                ProgramAttributes attributes = new ProgramAttributes();
+                attributes.foundLoop = false;
+                attributes.numSplits = -1;
+
                 Console.WriteLine("\tEND Executing {0} {1} with Exception {2}", binaryName, arguments, e);
-                return new Tuple<int, bool, List<Tuple<int, int>>>(-1, false, null);
+                return attributes;
             }
         }
 
-        private static void RegisterResult(string directory, string tag, int i, bool foundLoops, int option, BoogieResult result, int timeInSeconds)
+        private static void RegisterResult(
+            string directory, 
+            string tag, 
+            int splitId, 
+            ProgramAttributes attributes,
+            BoogieResult result, 
+            int timeInSeconds )
         {
           if (!results.ContainsKey(directory))
           {
-            results[directory] = new List<Tuple<string, int, bool, int, BoogieResult, int>>();
+            results[directory] = new List<Tuple<string, int, ProgramAttributes, BoogieResult, int>>();
           }
-          results[directory].Add(Tuple.Create(tag, i, foundLoops, option, result, timeInSeconds));
+          results[directory].Add(Tuple.Create(tag, splitId, attributes, result, timeInSeconds));
         }
 
         private static void GenerateResultOutput(string resultFileName, Tuple<int,int,int> stats)
@@ -313,18 +342,22 @@ namespace CfiDriver
           TextWriter output = new StreamWriter(resultFileName); 
           foreach (string directory in results.Keys)
           {
-            List<Tuple<string, int, bool, int, BoogieResult,int>> entries = results[directory].OrderBy(x => x.Item2).ToList();
-            foreach (Tuple<string, int, bool, int, BoogieResult,int> entry in entries)
+            List<Tuple<string, int, ProgramAttributes, BoogieResult,int>> entries = results[directory].OrderBy(x => x.Item2).ToList(); // order by split id
+            foreach (Tuple<string, int, ProgramAttributes, BoogieResult,int> entry in entries)
             {
               output.WriteLine(directory + "<" + entry.Item1 + "," + entry.Item2.ToString() + "> : " +
-                  entry.Item5 + (entry.Item3 ? "[LOOP]" : "") + ("[option:" + entry.Item4 + "]") + ("[time:" + entry.Item6 + "]"));
+                  entry.Item4 +
+                  "[" + entry.Item3.assertionTypes[entry.Item2] + "]" +
+                  "[blocks:" + entry.Item3.numBasicBlocks.ToString() + "]" +
+                  (entry.Item3.foundLoop ? "[LOOP]" : "[NOLOOP]") + 
+                  ("[time:" + entry.Item5 + "]"));
               if (!sum.ContainsKey(entry.Item1))
               {
-                sum[entry.Item1] = entry.Item6;
+                sum[entry.Item1] = entry.Item5;
               }
               else
               {
-                sum[entry.Item1] += entry.Item6;
+                sum[entry.Item1] += entry.Item5;
               }
             }
           }

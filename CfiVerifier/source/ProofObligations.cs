@@ -127,10 +127,10 @@ namespace CfiVerifier
                     //Console.Write(".");
                     switch (Utils.getSlashVerifyCmdType(ac))
                     {
-                        case Utils.SlashVerifyCmdType.Store8:
-                        case Utils.SlashVerifyCmdType.Store16:
-                        case Utils.SlashVerifyCmdType.Store32:
-                        case Utils.SlashVerifyCmdType.Store64: //mem := store(mem, y, e)
+                        case SlashVerifyCmdType.Store8:
+                        case SlashVerifyCmdType.Store16:
+                        case SlashVerifyCmdType.Store32:
+                        case SlashVerifyCmdType.Store64: //mem := store(mem, y, e)
                             {
                                 Tuple<Variable, Expr, Expr> storeArgs = Utils.getStoreArgs(ac);
                                 Expr store_addr = storeArgs.Item2;
@@ -153,9 +153,9 @@ namespace CfiVerifier
 
                                 //Console.WriteLine("store to {0} at addr {1} with value {2}", storeArgs.Item1, storeArgs.Item2, storeArgs.Item3);
                                 int iterations =
-                                  Utils.getSlashVerifyCmdType(ac) == Utils.SlashVerifyCmdType.Store8 ? 1 :
-                                  Utils.getSlashVerifyCmdType(ac) == Utils.SlashVerifyCmdType.Store16 ? 2 :
-                                  Utils.getSlashVerifyCmdType(ac) == Utils.SlashVerifyCmdType.Store32 ? 4 : 8;
+                                  Utils.getSlashVerifyCmdType(ac) == SlashVerifyCmdType.Store8 ? 1 :
+                                  Utils.getSlashVerifyCmdType(ac) == SlashVerifyCmdType.Store16 ? 2 :
+                                  Utils.getSlashVerifyCmdType(ac) == SlashVerifyCmdType.Store32 ? 4 : 8;
 
                                 //instrument assert ((addrInStack(PLUS_64(t_a, 0bv64)) && GE_64(PLUS_64(t_a, 0bv64), old(RSP))) ==> 
                                 //    writable(mem,PLUS_64(t_a, 0bv64)) || writable(mem,MINUS_64(t_a, 8bv64))) && (addrInBitmap(PLUS_64(t_a, 0bv64)) ==> 
@@ -186,7 +186,7 @@ namespace CfiVerifier
                                 Expr check_for_stack_store = Expr.Imp(is_checkworthy_store, is_writable);
                                 assertion = new AssertCmd(Token.NoToken, check_for_stack_store);
                                 newCmdSeq.Add(assertion);
-                                VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion);
+                                VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion, Utils.getSlashVerifyCmdType(ac));
 
                                 for (int iter = 0; iter < iterations; iter++)
                                 {
@@ -224,7 +224,7 @@ namespace CfiVerifier
 
                                     assertion = new AssertCmd(Token.NoToken, check_for_bitmap_store);
                                     newCmdSeq.Add(assertion);
-                                    VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion);
+                                    VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion, Utils.getSlashVerifyCmdType(ac));
                                 }
 
                                 if (Options.confidentiality)
@@ -261,13 +261,13 @@ namespace CfiVerifier
 
                                     assertion = new AssertCmd(Token.NoToken, Expr.Or(addr_in_U, addr_in_Data));
                                     newCmdSeq.Add(assertion);
-                                    VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion);
+                                    VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion, Utils.getSlashVerifyCmdType(ac));
                                 }
 
                                 break;
                             }
 
-                        case Utils.SlashVerifyCmdType.RepStosB: //x := REP_STOSB(mem, e1, e2, e3)
+                        case SlashVerifyCmdType.RepStosB: //x := REP_STOSB(mem, e1, e2, e3)
                             {
                                 //TODO: might want to assert that it writes to the bitmap
                                 //if its writing zeros to bitmap, we dont need to assert anything
@@ -290,7 +290,7 @@ namespace CfiVerifier
                                         new List<Expr>() { rhs, new OldExpr(Token.NoToken, new IdentifierExpr(Token.NoToken, RSP)) });
                                     AssertCmd assertion = new AssertCmd(Token.NoToken, Expr.And(alignment, le_old_RSP));
                                     newCmdSeq.Add(assertion);
-                                    VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion);
+                                    VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion, SlashVerifyCmdType.SetRSP);
                                 }
 
                                 break;
@@ -329,11 +329,11 @@ namespace CfiVerifier
                                              Expr.Eq(new IdentifierExpr(Token.NoToken, RSP), new OldExpr(Token.NoToken, new IdentifierExpr(Token.NoToken, RSP))));
                                 assertion = new AssertCmd(Token.NoToken, Expr.Imp(precondition, addr_not_writable));
                                 newCmdSeq.Add(assertion);
-                                VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion);
+                                VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion, SlashVerifyCmdType.Ret);
                                 addr_offset += 8;
                             }
                             int numAssertsAfterReturn = VCSplitter.Instance.getCurrentAssertionCount();
-                            Console.WriteLine("VCSplitter says that ret produced assertions ({0},{1})", numAssertsBeforeReturn, numAssertsAfterReturn - 1);
+                            //Console.WriteLine("VCSplitter says that ret produced assertions ({0},{1})", numAssertsBeforeReturn, numAssertsAfterReturn - 1);
                             //assertion = new AssertCmd(Token.NoToken, instantiation);
                         }
                         else
@@ -359,7 +359,7 @@ namespace CfiVerifier
                               Expr.Imp(Expr.And(Expr.And(in_local_frame, in_stack), aligned), not_writable));
                             assertion = new AssertCmd(Token.NoToken, assert_mem_false_expr);
                             newCmdSeq.Add(assertion);
-                            VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion);
+                            VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion, SlashVerifyCmdType.Ret);
                         }
 
 
@@ -367,7 +367,7 @@ namespace CfiVerifier
                         assertion = new AssertCmd(Token.NoToken, Expr.Eq(new IdentifierExpr(Token.NoToken, RSP),
                                                                            new OldExpr(Token.NoToken, new IdentifierExpr(Token.NoToken, RSP))));
                         newCmdSeq.Add(assertion);
-                        VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion);
+                        VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion, SlashVerifyCmdType.Ret);
                     }
                     else if (attribute_cmdtype != null && attribute_cmdtype.Equals("call"))
                     {
@@ -396,7 +396,7 @@ namespace CfiVerifier
                         {
                             assertion = new AssertCmd(Token.NoToken, is_policy);
                             newCmdSeq.Add(assertion);
-                            VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion);
+                            VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion, SlashVerifyCmdType.Call);
                         }
 
                         if (!this.bound_stacksize_option)
@@ -415,7 +415,7 @@ namespace CfiVerifier
                             Expr assert_mem_false_expr = new ForallExpr(Token.NoToken, new List<Variable>() { i }, Expr.Imp(Expr.And(in_stack, in_local_frame), not_writable));
                             assertion = new AssertCmd(Token.NoToken, assert_mem_false_expr);
                             newCmdSeq.Add(assertion);
-                            VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion);
+                            VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion, SlashVerifyCmdType.Call);
 
                             //assert !writable(mem, rsp-8)
                             not_writable = Expr.Not(new NAryExpr(Token.NoToken, new FunctionCall(writable),
@@ -428,7 +428,7 @@ namespace CfiVerifier
                                             }));
                             assertion = new AssertCmd(Token.NoToken, not_writable);
                             newCmdSeq.Add(assertion);
-                            VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion);
+                            VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion, SlashVerifyCmdType.Call);
                         }
                         else
                         {
@@ -441,7 +441,7 @@ namespace CfiVerifier
                               new List<Expr>() { new IdentifierExpr(Token.NoToken, RSP), smallest_allowed_address });
                             assertion = new AssertCmd(Token.NoToken, rsp_in_local_frame);
                             newCmdSeq.Add(assertion);
-                            VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion);
+                            VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion, SlashVerifyCmdType.Call);
                         }
 
                         //assert RSP <= (old(RSP) - 32)
@@ -452,7 +452,7 @@ namespace CfiVerifier
                                                                     new LiteralExpr(Token.NoToken, BigNum.FromInt(32), 64) }) });
                         assertion = new AssertCmd(Token.NoToken, stack_backing_space);
                         newCmdSeq.Add(assertion);
-                        VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion);
+                        VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion, SlashVerifyCmdType.Call);
                     }
                     else if (attribute_cmdtype != null && attribute_jmptarget != null &&
                               (attribute_cmdtype.Equals("remotejmp") ||
@@ -485,12 +485,12 @@ namespace CfiVerifier
                         }
                         assertion = new AssertCmd(Token.NoToken, is_policy);
                         newCmdSeq.Add(assertion);
-                        VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion);
+                        VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion, SlashVerifyCmdType.RemoteJmp);
 
                         assertion = new AssertCmd(Token.NoToken, Expr.Eq(new IdentifierExpr(Token.NoToken, RSP),
                                                                          new OldExpr(Token.NoToken, new IdentifierExpr(Token.NoToken, RSP))));
                         newCmdSeq.Add(assertion);
-                        VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion);
+                        VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion, SlashVerifyCmdType.RemoteJmp);
 
                         //forall i. i < rsp ==> ¬writable(mem,i)
                         BoundVariable i = new BoundVariable(Token.NoToken, new TypedIdent(Token.NoToken, "i", this.mem.TypedIdent.Type.AsMap.Arguments[0]));
@@ -502,7 +502,7 @@ namespace CfiVerifier
                         Expr assert_mem_false_expr = new ForallExpr(Token.NoToken, new List<Variable>() { i }, Expr.Imp(Expr.And(in_stack, in_local_frame), not_writable));
                         assertion = new AssertCmd(Token.NoToken, assert_mem_false_expr);
                         newCmdSeq.Add(assertion);
-                        VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion);
+                        VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion, SlashVerifyCmdType.RemoteJmp);
                     }
                 }
 
