@@ -69,6 +69,43 @@ namespace CfiVerifier
             //s.Visit(prog);
             return true;
         }
+        
+        public static bool ParseString(string fstring, out Program prog)
+        {
+            prog = null;
+            int errCount;
+            try
+            {
+                errCount = Parser.Parse(fstring, "<no file>", out prog);
+                if (errCount != 0 || prog == null)
+                {
+                    Console.WriteLine("WARNING: {0} parse errors detected in {1}", errCount, fstring);
+                    return false;
+                }
+            }
+            catch (IOException e)
+            {
+                Console.WriteLine("WARNING: Error opening file \"{0}\": {1}", fstring, e.Message);
+                return false;
+            }
+
+            errCount = prog.Resolve();
+            if (errCount > 0)
+            {
+                Console.WriteLine("WARNING: {0} name resolution errors in {1}", errCount, fstring);
+                return false;
+            }
+            errCount = prog.Typecheck();
+            if (errCount > 0)
+            {
+                Console.WriteLine("WARNING: {0} type checking errors in {1}", errCount, fstring);
+                return false;
+            }
+            //var s = new FindLocationAssertion();
+            //s.Visit(prog);
+            return true;
+        }
+
         #endregion
 
         public static LocalVariable MkLocalVar(string v, BType t)
@@ -350,7 +387,5 @@ namespace CfiVerifier
             //Console.WriteLine("We should capture mem here: {0}", currentNode.Label);
             return new Tuple<string, List<string>>(currentNode.Label, loopHeaderLabels);
         }
-
-
     }
 }

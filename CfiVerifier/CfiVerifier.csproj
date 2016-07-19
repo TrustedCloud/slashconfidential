@@ -65,6 +65,7 @@
     <Compile Include="source\SpecialInstructionLifter.cs" />
     <Compile Include="source\SplitMemoryModeler.cs" />
     <Compile Include="source\StackSizeEstimator.cs" />
+    <Compile Include="source\TaintPreserver.cs" />
     <Compile Include="source\utils.cs" />
     <Compile Include="source\vc.cs" />
     <Compile Include="source\VCSplitter.cs" />
@@ -146,6 +147,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
+    <None Include="ClassDiagram1.cd" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
