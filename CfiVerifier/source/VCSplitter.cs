@@ -187,13 +187,43 @@ namespace CfiVerifier
             }
 
             shared_result_struct = new Dictionary<int, bool>();
-            Parallel.For(0, numAssertions, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, i => CheckAssertion(i));
+
+            //Parallel.For(0, numAssertions, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, i => CheckAssertion(i));
+
+            // work stealing parallel implementation 
+            workItems = new System.Collections.Concurrent.ConcurrentBag<int>();
+            for (int i = 0; i < numAssertions; i++) workItems.Add(i);
+
+            var threads = new List<Thread>();
+            for (int i = 0; i < Environment.ProcessorCount; i++)
+            {
+                threads.Add(new Thread(new ThreadStart(CheckAssertions)));
+            }
+
+            threads.Iter(t => t.Start());
+            threads.Iter(t => t.Join());
+
+            
             foreach (Tuple<string, Cmd, AssertCmd, SlashVerifyCmdType> assertion in assertions)
             {
                 result[new Tuple<string, Cmd, AssertCmd>(assertion.Item1, assertion.Item2, assertion.Item3)] = 
                     shared_result_struct[intermediate[assertion]];
             }
             return result;
+        }
+
+        private System.Collections.Concurrent.ConcurrentBag<int> workItems;
+
+        private void CheckAssertions()
+        {
+            while (true)
+            {
+                // grab work
+                int work;
+                if (!workItems.TryTake(out work)) break;
+
+                CheckAssertion(work);
+            }
         }
 
         private void CheckAssertion(int i)
