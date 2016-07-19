@@ -16,7 +16,7 @@ using BType = Microsoft.Boogie.Type;
 
 namespace CfiVerifier 
 {
-    public class TaintPreserver : StandardVisitor
+    class TaintPreserver : StandardVisitor
     {
         private Program prog;
         private Implementation impl;
@@ -25,7 +25,7 @@ namespace CfiVerifier
         private HashSet<Cmd> keep_set;
         private Dictionary<Cmd, HashSet<Variable>> live_set;
     
-        public TaintPreserver(Program prog, Tuple<string, Cmd, AssertCmd> assertion_info, int count)
+        public TaintPreserver(Program prog, Tuple<string, AssertCmd> assertion_info, int count)
         {
     	Utils.Assert(prog.Implementations.Count() == 1, "Expecting a single implementation");
     	this.impl = prog.Implementations.ElementAt(0);
@@ -39,7 +39,7 @@ namespace CfiVerifier
     	    foreach (Cmd c in b.Cmds)
     	    {
     		this.live_set.Add(c, new HashSet<Variable>());
-    		if (b.Label == assertion_info.Item1 && c is AssertCmd && (c as AssertCmd).Expr.ToString() == assertion_info.Item3.Expr.ToString())
+    		if (b.Label == assertion_info.Item1 && c is AssertCmd && (c as AssertCmd).Expr.ToString() == assertion_info.Item2.Expr.ToString())
     		    source_assert = c as AssertCmd;
     	    }
     	}

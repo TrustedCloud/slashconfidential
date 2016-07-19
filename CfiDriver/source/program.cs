@@ -349,8 +349,8 @@ namespace CfiDriver
         private static void EmitBenchmarkResults(string resultFileName, string directory)
         {
             TextWriter tw = new StreamWriter(resultFileName, true);
-            List<Tuple<string, int, bool, int, BoogieResult, int>> entries = results[directory].OrderBy(x => x.Item2).ToList();
-            foreach (Tuple<string, int, bool, int, BoogieResult, int> entry in entries)
+            List<Tuple<string, int, ProgramAttributes, BoogieResult, int>> entries = results[directory].OrderBy(x => x.Item2).ToList();
+            foreach (Tuple<string, int, ProgramAttributes, BoogieResult, int> entry in entries)
             {
                 tw.WriteLine(directory + "<" + entry.Item1 + "," + entry.Item2.ToString() + "> :" +
                   entry.Item4 +

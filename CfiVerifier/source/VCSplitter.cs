@@ -260,7 +260,7 @@ namespace CfiVerifier
                 new_prog.Emit(ttw);
                 Utils.ParseString(sw.ToString(), out new_prog);
                 Console.WriteLine("Now analysing split {0}.", impl_counter);
-                (new TaintPreserver(new_prog, assertion, impl_counter)).Visit(new_prog);
+                (new TaintPreserver(new_prog, new Tuple<string, AssertCmd>(assertion.Item1, assertion.Item3), impl_counter)).Visit(new_prog);
                 sw.Close();
                 ttw.Close();
                 ttw = new TokenTextWriter(filename);
