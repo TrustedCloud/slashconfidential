@@ -146,7 +146,7 @@ namespace CfiVerifier
                 //Console.WriteLine("\tEND Executing {0} {1}", binaryName, arguments);
                 return result(output);
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 //Console.WriteLine("\tEND Executing {0} {1} with Exception {2}", binaryName, arguments, e);
                 return false;
@@ -228,7 +228,7 @@ namespace CfiVerifier
 
         private void CheckAssertion(int i)
         {
-            string args = Options.outputPath + @"/" + Options.splitFilesDir + @"/intermediate_" + i.ToString() + ".bpl /timeLimit:300 /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0";
+            string args = Options.outputPath + @"/" + Options.splitFilesDir + @"/intermediate_" + i.ToString() + ".bpl /timeLimit:10 /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0 /errorLimit:1";
             bool boogie_result = ExecuteBoogieBinary(args);
             shared_result_struct.Add(i, boogie_result);
         }
@@ -275,25 +275,27 @@ namespace CfiVerifier
             {
                 string tag = Options.tag != "" ? @"." + Options.tag : "";
                 var filename = Options.outputPath + @"/" + Options.splitFilesDir + @"/split_" + impl_counter.ToString() + tag + @".bpl";
-                var tuo = new TokenTextWriter(filename);
-                try
-                {
-                    //emit all the vars, consts, functions, axioms, and typedecls
-                    foreach (Declaration d in prog.TopLevelDeclarations)
+                StringWriter sw = new StringWriter();
+                TokenTextWriter ttw = new TokenTextWriter(sw);
+                Program new_prog = new Program();
+                Implementation new_impl = null;
+                foreach (Declaration d in prog.TopLevelDeclarations)
+                    if (!(d is Implementation))
+                        new_prog.AddTopLevelDeclaration(d);
+                    else
                     {
-                        if (!(d is Implementation))
-                        {
-                            d.Emit(tuo, 0);
-                        }
+                        new_impl = instrumentAssertion(original_impl, assertion.Item1, assertion.Item2, assertion.Item3);
+                        new_prog.AddTopLevelDeclaration(new_impl);
                     }
-                    //emit the instrumented implementation
-                    Implementation new_impl = instrumentAssertion(original_impl, assertion.Item1, assertion.Item2, assertion.Item3);
-                    new_impl.Emit(tuo, 0);
-                }
-                finally
-                {
-                    tuo.Close();
-                }
+                new_prog.Emit(ttw);
+                Utils.ParseString(sw.ToString(), out new_prog);
+                Console.WriteLine("Now analysing split {0}.", impl_counter);
+                (new TaintPreserver(new_prog, new Tuple<string, AssertCmd>(assertion.Item1, assertion.Item3), impl_counter)).Visit(new_prog);
+                sw.Close();
+                ttw.Close();
+                ttw = new TokenTextWriter(filename);
+                new_prog.Emit(ttw);
+                ttw.Close();
                 impl_counter++;
             }
             Console.WriteLine("VCSplitter generated {0} assertions", assertions.Count);

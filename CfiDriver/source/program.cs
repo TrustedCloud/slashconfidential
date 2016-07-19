@@ -15,9 +15,12 @@ namespace CfiDriver
     {
         enum BoogieResult { VERIFIED, ERROR, UNKNOWN };
 
+        static bool verbose = true;
+        static string resultFileName = @"ResultSummary_" + DateTime.Now.Hour.ToString() + "_" 
+            + DateTime.Now.Minute.ToString() + "_" + DateTime.Now.Second.ToString() + ".txt";
+
         //key: directory, value: [tag, splitId, attributes, boogieResult, timeInSeconds]
         static Dictionary<string, List<Tuple<string,int,ProgramAttributes,BoogieResult,int>>> results;
-
         static List<Tuple<string, string, string, string>> benchmarks; //<directory, input bpl, options, run_type_name>
 
         private void Usage()
@@ -47,8 +50,7 @@ namespace CfiDriver
                 args.Contains("/option:optimizestore"),
                 args.Contains("/option:optimizeload"));
 
-            var dateString = DateTime.Now.Hour.ToString() + "_" + DateTime.Now.Minute.ToString() + "_" + DateTime.Now.Second.ToString();
-            GenerateResultOutput(@"CfiResultsSummary_" + dateString + ".txt", stats);
+            GenerateResultOutput(resultFileName, stats);
         }
 
         public static Tuple<int, int, int> RunBenchmarks(List<Tuple<string, string, string, string>> benchmarks, bool doNotRunBenchmarks, bool splitMemory, bool optimizeStore, bool optimizeLoad)
@@ -56,6 +58,11 @@ namespace CfiDriver
           //item1 = benchmarks\StackExample\func_0000000000001000, item2 = dllfunc.bpl, item3 = "", item4 = "baseline"
           var delim = Options.IsLinux() ? @"/" : @"\";
           int numVerified = 0, numError = 0, numUnknown = 0;
+          if (splitMemory)
+          {
+              optimizeLoad = true;
+              optimizeStore = true;
+          }
 
           //item1: directory, item2: bpl file, item3: options, item4: tag
           foreach (Tuple<string, string, string, string> benchmark in benchmarks)
@@ -81,28 +88,33 @@ namespace CfiDriver
 
               if (attributes.numSplits < 0)
               {
-                  throw new Exception("Benchmark " + benchmark.Item1 + " did not generate any assertions");
+                  Console.WriteLine("Benchmark " + benchmark.Item1 + " did not generate any assertions");
+                  continue;
               }
               Console.WriteLine("\tFOUND {0} assertions in benchmark {1}, Running them in parallel...", 
                   attributes.numSplits, 
                   benchmark.Item1);
-              if (!doNotRunBenchmarks) { CheckAssertionsInParallel(benchmark.Item1, benchmark.Item4, attributes); }
+              if (!doNotRunBenchmarks) { 
+                  CheckAssertionsInParallel(benchmark.Item1, benchmark.Item4, attributes);
+                  Tuple<int, int, int> stats = ComputeStatisticsForDirectory(benchmark.Item1);
+                  numVerified += stats.Item1;
+                  numError += stats.Item2;
+                  numUnknown += stats.Item3;
+                  EmitBenchmarkResults(resultFileName, benchmark.Item1);
+              }
 
               // generate a script in case we want to run benchmarks later manually
-              TextWriter fileWriter = new StreamWriter("script");
-              for (int i = 0; i < attributes.numSplits; i++)
-              {
-                  string boogie_args = @" " + benchmark.Item1 + delim + @"split_" + i.ToString() + @"." + 
-                      benchmark.Item4 + ".bpl /timeLimit:" + Options.timeoutPerProcess + 
-                      @" /contractInfer /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0";
-                  string boogie_bin = @"." + delim + "references" + delim + "Boogie.exe";
-                  fileWriter.WriteLine(boogie_bin + boogie_args);
-              }
-              fileWriter.Flush();
-              fileWriter.Close();
-
-              Tuple<int, int, int> stats = ComputeStatisticsForDirectory(benchmark.Item1);
-              numVerified += stats.Item1; numError += stats.Item2; numUnknown += stats.Item3;
+              //TextWriter fileWriter = new StreamWriter("script");
+              //for (int i = 0; i < attributes.numSplits; i++)
+              //{
+              //    string boogie_args = @" " + benchmark.Item1 + delim + @"split_" + i.ToString() + @"." + 
+              //        benchmark.Item4 + ".bpl /timeLimit:" + Options.timeoutPerProcess + 
+              //        @" /contractInfer /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0 /errorLimit:1";
+              //    string boogie_bin = @"." + delim + "references" + delim + "Boogie.exe";
+              //    fileWriter.WriteLine(boogie_bin + boogie_args);
+              //}
+              //fileWriter.Flush();
+              //fileWriter.Close();
           }
 
           return new Tuple<int, int, int>(numVerified, numError, numUnknown);
@@ -143,8 +155,7 @@ namespace CfiDriver
             var delim = Options.IsLinux() ? @"/" : @"\";
 
             string args0 = @" " + directory + delim + @"split_" + splitId.ToString() + @"." + tag + ".bpl /timeLimit:" + Options.timeoutPerProcess;
-            string args1 = args0 + @" /contractInfer /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0";
-            //string args2 = args0 + @" /typeEncoding:m /useArrayTheory";
+            string args1 = args0 + @" /contractInfer /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0 /errorLimit:1";
 
             //item1: error / unknown / verified, item2: time spent in boogie
             Tuple<BoogieResult, int> args1_result = ExecuteBoogieBinary(args1);
@@ -166,7 +177,8 @@ namespace CfiDriver
             return BoogieResult.UNKNOWN;
           };
 
-          Console.WriteLine("\tSTART Executing {0} {1}", binaryName, arguments);
+          if (verbose)
+            Console.WriteLine("\tSTART Executing {0} {1}", binaryName, arguments);
           try
           {
             ProcessStartInfo procInfo = new ProcessStartInfo();
@@ -184,7 +196,8 @@ namespace CfiDriver
             string output = "";
             output = proc.StandardOutput.ReadToEnd();
             proc.WaitForExit();
-            Console.WriteLine("\tEND Executing {0} {1}", binaryName, arguments);
+            if (verbose)
+                Console.WriteLine("\tEND Executing {0} {1}", binaryName, arguments);
             return new Tuple<BoogieResult, int>(result(output), sw.Elapsed.Minutes * 60 + sw.Elapsed.Seconds);
           }
           catch (Exception e)
@@ -336,29 +349,33 @@ namespace CfiDriver
           results[directory].Add(Tuple.Create(tag, splitId, attributes, result, timeInSeconds));
         }
 
-        private static void GenerateResultOutput(string resultFileName, Tuple<int,int,int> stats)
+        private static void EmitBenchmarkResults(string resultFileName, string directory)
         {
-          Dictionary<string,int> sum = new Dictionary<string,int>();
-          TextWriter output = new StreamWriter(resultFileName); 
-          foreach (string directory in results.Keys)
-          {
-            List<Tuple<string, int, ProgramAttributes, BoogieResult,int>> entries = results[directory].OrderBy(x => x.Item2).ToList(); // order by split id
-            foreach (Tuple<string, int, ProgramAttributes, BoogieResult,int> entry in entries)
+            TextWriter tw = new StreamWriter(resultFileName, true);
+            List<Tuple<string, int, ProgramAttributes, BoogieResult, int>> entries = results[directory].OrderBy(x => x.Item2).ToList();
+            foreach (Tuple<string, int, ProgramAttributes, BoogieResult, int> entry in entries)
             {
-              output.WriteLine(directory + "<" + entry.Item1 + "," + entry.Item2.ToString() + "> : " +
+                tw.WriteLine(directory + "<" + entry.Item1 + "," + entry.Item2.ToString() + "> :" +
                   entry.Item4 +
                   "[" + entry.Item3.assertionTypes[entry.Item2] + "]" +
                   "[blocks:" + entry.Item3.numBasicBlocks.ToString() + "]" +
                   (entry.Item3.foundLoop ? "[LOOP]" : "[NOLOOP]") + 
                   ("[time:" + entry.Item5 + "]"));
-              if (!sum.ContainsKey(entry.Item1))
-              {
-                sum[entry.Item1] = entry.Item5;
-              }
-              else
-              {
-                sum[entry.Item1] += entry.Item5;
-              }
+            }
+            tw.Flush();
+            tw.Close();
+        }
+
+        private static void GenerateResultOutput(string resultFileName, Tuple<int,int,int> stats)
+        {
+          Dictionary<string,int> sum = new Dictionary<string,int>();
+          TextWriter output = new StreamWriter(resultFileName, true); 
+          foreach (string directory in results.Keys)
+          {
+            List<Tuple<string, int, ProgramAttributes, BoogieResult,int>> entries = results[directory].OrderBy(x => x.Item2).ToList(); // order by split id
+            foreach (Tuple<string, int, ProgramAttributes, BoogieResult,int> entry in entries)
+            {
+                sum[entry.Item1] = !sum.ContainsKey(entry.Item1) ? entry.Item5 : sum[entry.Item1] + entry.Item5;
             }
           }
           foreach (string s in sum.Keys)
