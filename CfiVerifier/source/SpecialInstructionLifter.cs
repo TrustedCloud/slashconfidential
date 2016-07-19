@@ -47,7 +47,8 @@ namespace CfiVerifier
             Utils.Assert(this.mem != null, "Could not find mem variable");
 
             //this has been moved to Bap2Boogie, but let's just have it here as well
-            foreach (String name in new List<String>() { "R8", "R9", "R10", "R11", "R12", "R13", "R14", "R15", "RAX", "RBX", "RCX", "RDX", "RBP", "RDI", "RSI", "RSP" })
+            foreach (String name in new List<String>() { "R8", "R9", "R10", "R11", "R12", "R13", "R14", "R15", 
+                                                         "RAX", "RBX", "RCX", "RDX", "RBP", "RDI", "RSI", "RSP" })
             {
                 GlobalVariable gv = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals(name));
                 if (gv == null) //not found, so let's add it in ourself

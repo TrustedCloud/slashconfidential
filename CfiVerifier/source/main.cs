@@ -92,6 +92,7 @@ namespace CfiVerifier
             Dictionary<Tuple<string, Cmd, AssertCmd>, bool> storeAddressRegionDB, 
             Dictionary<Tuple<string, Cmd, AssertCmd>, bool>  loadAddressRegionDB )
         {
+            Console.WriteLine("CfiVerifier found " + impl.Blocks.Count + " basic blocks");
             (new SpecialInstructionLifter()).Visit(prog);
             Utils.PrintProg(prog);
             if (Options.splitMemoryModel) { (new SplitMemoryModeler(storeAddressRegionDB, loadAddressRegionDB)).Visit(prog); }
@@ -107,7 +108,7 @@ namespace CfiVerifier
             List<Block> blocksInNaturalLoops = loopDetector.getBlocksInNaturalLoops();
             if (blocksInNaturalLoops.Count > 0)
             {
-                Console.WriteLine("Found loop");
+                Console.WriteLine("CfiVerifier found one or more loops");
                 Console.WriteLine("Blocks in loops: {0}", blocksInNaturalLoops.MapConcat(x => x.Label, ","));
             }
 
@@ -128,6 +129,7 @@ namespace CfiVerifier
             Console.WriteLine("\nInstrumented Program with CFI assertions and generated output file {0}", Options.instrumentedFile);
             Utils.PrintProg(prog);
             VCSplitter.Instance.PrintInstrumentedProcedures(prog);
+            VCSplitter.Instance.PrintAssertionTypes();
         }
 
     }

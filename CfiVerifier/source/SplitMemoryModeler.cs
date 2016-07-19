@@ -102,11 +102,11 @@ namespace CfiVerifier
                     {
                         AssertCmd assertion = new AssertCmd(Token.NoToken, new NAryExpr(Token.NoToken, new FunctionCall(addrInBitmap), new List<Expr>() { load_addr }));
                         newCmdSeq.Add(assertion);
-                        VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion);
+                        VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion, Utils.getSlashVerifyCmdType(ac));
 
                         assertion = new AssertCmd(Token.NoToken, new NAryExpr(Token.NoToken, new FunctionCall(addrInStack), new List<Expr>() { load_addr }));
                         newCmdSeq.Add(assertion);
-                        VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion);
+                        VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion, Utils.getSlashVerifyCmdType(ac));
                     }
                 }
 
@@ -168,10 +168,10 @@ namespace CfiVerifier
                     //Console.Write(".");
                     switch (Utils.getSlashVerifyCmdType(ac))
                     {
-                        case Utils.SlashVerifyCmdType.Store8:
-                        case Utils.SlashVerifyCmdType.Store16:
-                        case Utils.SlashVerifyCmdType.Store32:
-                        case Utils.SlashVerifyCmdType.Store64: //mem := store(mem, y, e)
+                        case SlashVerifyCmdType.Store8:
+                        case SlashVerifyCmdType.Store16:
+                        case SlashVerifyCmdType.Store32:
+                        case SlashVerifyCmdType.Store64: //mem := store(mem, y, e)
                             {
                                 Tuple<Variable, Expr, Expr> storeArgs = Utils.getStoreArgs(ac);
                                 Expr store_addr = storeArgs.Item2;
@@ -179,11 +179,11 @@ namespace CfiVerifier
 
                                 AssertCmd assertion = new AssertCmd(Token.NoToken, new NAryExpr(Token.NoToken, new FunctionCall(addrInBitmap), new List<Expr>() { store_addr }));
                                 newCmdSeq.Add(assertion);
-                                VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion);
+                                VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion, Utils.getSlashVerifyCmdType(ac));
 
                                 assertion = new AssertCmd(Token.NoToken, new NAryExpr(Token.NoToken, new FunctionCall(addrInStack), new List<Expr>() { store_addr }));
                                 newCmdSeq.Add(assertion);
-                                VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion);
+                                VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion, Utils.getSlashVerifyCmdType(ac));
 
                                 Expr addr_in_mem =
                                     Expr.And(
@@ -193,12 +193,12 @@ namespace CfiVerifier
                                             new List<Expr>() { store_addr, new IdentifierExpr(Token.NoToken, this.bitmap_low) }));
                                 assertion = new AssertCmd(Token.NoToken, addr_in_mem);
                                 newCmdSeq.Add(assertion);
-                                VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion);
+                                VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion, Utils.getSlashVerifyCmdType(ac));
 
                                 break;
                             }
 
-                        case Utils.SlashVerifyCmdType.RepStosB: //x := REP_STOSB(mem, e1, e2, e3)
+                        case SlashVerifyCmdType.RepStosB: //x := REP_STOSB(mem, e1, e2, e3)
                             {
                                 break;
                             }
@@ -405,10 +405,10 @@ namespace CfiVerifier
 
                     switch (Utils.getSlashVerifyCmdType(ac))
                     {
-                        case Utils.SlashVerifyCmdType.Store8:
-                        case Utils.SlashVerifyCmdType.Store16:
-                        case Utils.SlashVerifyCmdType.Store32:
-                        case Utils.SlashVerifyCmdType.Store64: //mem := store(mem, y, e)
+                        case SlashVerifyCmdType.Store8:
+                        case SlashVerifyCmdType.Store16:
+                        case SlashVerifyCmdType.Store32:
+                        case SlashVerifyCmdType.Store64: //mem := store(mem, y, e)
                             {
                                 Tuple<Variable, Expr, Expr> storeArgs = Utils.getStoreArgs(ac);
                                 Expr store_addr = storeArgs.Item2;
@@ -474,7 +474,7 @@ namespace CfiVerifier
                                 break;
                             }
 
-                        case Utils.SlashVerifyCmdType.RepStosB:
+                        case SlashVerifyCmdType.RepStosB:
                             {
                                 Tuple<Variable, Expr, Expr, Expr> repstosArgs = Utils.getRepStosbArgs(ac);
                                 Expr base_addr = repstosArgs.Item3;
