@@ -134,11 +134,39 @@ namespace CfiDriver
             return new Tuple<int, int, int>(numVerified, numError, numUnknown);
         }
 
+        private static System.Collections.Concurrent.ConcurrentBag<Tuple<string, string, int, ProgramAttributes>> workItems;
+
         private static void CheckAssertionsInParallel(string directory, string tag, ProgramAttributes attributes)
         {
-            Parallel.For(0, attributes.numSplits, 
-              new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
-              i => CheckAssertion(directory, tag, i, attributes));
+            //Parallel.For(0, attributes.numSplits, 
+            //  new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
+            //  i => CheckAssertion(directory, tag, i, attributes));
+
+            // work stealing parallel implementation 
+            workItems = new System.Collections.Concurrent.ConcurrentBag<Tuple<string, string, int, ProgramAttributes>>();
+            for (int i = 0; i < attributes.numSplits; i++)
+                workItems.Add(Tuple.Create(directory, tag, i, attributes));
+
+            var threads = new List<Thread>();
+            for (int i = 0; i < Environment.ProcessorCount; i++)
+            {
+                threads.Add(new Thread(new ThreadStart(CheckAssertions)));
+            }
+
+            threads.ForEach(t => t.Start());
+            threads.ForEach(t => t.Join());
+
+        }
+        private static void CheckAssertions()
+        {
+            while (true)
+            {
+                // grab work
+                Tuple<string, string, int, ProgramAttributes> work;
+                if (!workItems.TryTake(out work)) break;
+
+                CheckAssertion(work.Item1, work.Item2, work.Item3, work.Item4);
+            }
         }
 
         private static void CheckAssertion(string directory, string tag, int splitId, ProgramAttributes attributes)
