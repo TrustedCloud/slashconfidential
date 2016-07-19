@@ -94,24 +94,27 @@ namespace CfiDriver
               Console.WriteLine("\tFOUND {0} assertions in benchmark {1}, Running them in parallel...", 
                   attributes.numSplits, 
                   benchmark.Item1);
-              if (!doNotRunBenchmarks) { CheckAssertionsInParallel(benchmark.Item1, benchmark.Item4, attributes); }
+              if (!doNotRunBenchmarks) { 
+                  CheckAssertionsInParallel(benchmark.Item1, benchmark.Item4, attributes);
+                  Tuple<int, int, int> stats = ComputeStatisticsForDirectory(benchmark.Item1);
+                  numVerified += stats.Item1;
+                  numError += stats.Item2;
+                  numUnknown += stats.Item3;
+                  EmitBenchmarkResults(resultFileName, benchmark.Item1);
+              }
 
               // generate a script in case we want to run benchmarks later manually
-              TextWriter fileWriter = new StreamWriter("script");
-              for (int i = 0; i < attributes.numSplits; i++)
-              {
-                  string boogie_args = @" " + benchmark.Item1 + delim + @"split_" + i.ToString() + @"." + 
-                      benchmark.Item4 + ".bpl /timeLimit:" + Options.timeoutPerProcess + 
-                      @" /contractInfer /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0 /errorLimit:1";
-                  string boogie_bin = @"." + delim + "references" + delim + "Boogie.exe";
-                  fileWriter.WriteLine(boogie_bin + boogie_args);
-              }
-              fileWriter.Flush();
-              fileWriter.Close();
-
-              Tuple<int, int, int> stats = ComputeStatisticsForDirectory(benchmark.Item1);
-              numVerified += stats.Item1; numError += stats.Item2; numUnknown += stats.Item3;
-              EmitBenchmarkResults(resultFileName ,benchmark.Item1);
+              //TextWriter fileWriter = new StreamWriter("script");
+              //for (int i = 0; i < attributes.numSplits; i++)
+              //{
+              //    string boogie_args = @" " + benchmark.Item1 + delim + @"split_" + i.ToString() + @"." + 
+              //        benchmark.Item4 + ".bpl /timeLimit:" + Options.timeoutPerProcess + 
+              //        @" /contractInfer /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0 /errorLimit:1";
+              //    string boogie_bin = @"." + delim + "references" + delim + "Boogie.exe";
+              //    fileWriter.WriteLine(boogie_bin + boogie_args);
+              //}
+              //fileWriter.Flush();
+              //fileWriter.Close();
           }
 
           return new Tuple<int, int, int>(numVerified, numError, numUnknown);
