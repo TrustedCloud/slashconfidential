@@ -65,7 +65,7 @@
     <Compile Include="source\SpecialInstructionLifter.cs" />
     <Compile Include="source\SplitMemoryModeler.cs" />
     <Compile Include="source\StackSizeEstimator.cs" />
-    <Compile Include="source\TaintPreserver.cs" />
+    <Compile Include="source\Slicer.cs" />
     <Compile Include="source\utils.cs" />
     <Compile Include="source\vc.cs" />
     <Compile Include="source\VCSplitter.cs" />

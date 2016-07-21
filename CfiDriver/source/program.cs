@@ -50,7 +50,10 @@ namespace CfiDriver
                 args.Contains("/option:optimizestore"),
                 args.Contains("/option:optimizeload"));
 
-            GenerateResultOutput(resultFileName, stats);
+            if (!args.Contains("/option:norun"))
+            {
+                GenerateResultOutput(resultFileName, stats);
+            }
         }
 
         public static Tuple<int, int, int> RunBenchmarks(List<Tuple<string, string, string, string>> benchmarks, bool doNotRunBenchmarks, bool splitMemory, bool optimizeStore, bool optimizeLoad)
@@ -94,7 +97,7 @@ namespace CfiDriver
               Console.WriteLine("\tFOUND {0} assertions in benchmark {1}, Running them in parallel...", 
                   attributes.numSplits, 
                   benchmark.Item1);
-              if (!doNotRunBenchmarks) { 
+              if (!doNotRunBenchmarks) {
                   CheckAssertionsInParallel(benchmark.Item1, benchmark.Item4, attributes);
                   Tuple<int, int, int> stats = ComputeStatisticsForDirectory(benchmark.Item1);
                   numVerified += stats.Item1;
@@ -390,6 +393,7 @@ namespace CfiDriver
                   (entry.Item3.foundLoop ? "[LOOP]" : "[NOLOOP]") + 
                   ("[time:" + entry.Item5 + "]"));
             }
+            tw.WriteLine("==== " + directory + " total duration:" + results[directory].Sum(i => i.Item5));
             tw.Flush();
             tw.Close();
         }
@@ -415,6 +419,7 @@ namespace CfiDriver
           output.WriteLine("Stats Unknown: {0}", stats.Item3);
           output.Flush();
           output.Close();
+          Console.WriteLine("Log file saved in " + resultFileName + ".");
         }
 
     }

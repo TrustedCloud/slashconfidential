@@ -109,6 +109,14 @@ namespace CfiVerifier
             this.target_label = label;
             this.target_typedCmd = typedCmd;
             this.target_assertion = assertion;
+            if (this.target_assertion.Attributes != null) 
+            {
+                this.target_assertion.Attributes.AddLast(new QKeyValue(Token.NoToken, "source_assert", new List<object> { Expr.True }, null));
+            }
+            else
+            {
+                this.target_assertion.Attributes = new QKeyValue(Token.NoToken, "source_assert", new List<object> { Expr.True }, null);
+            }
             this.target_acquired = false;
             this.Visit(new_impl); //this step performs the instrumentation
             Utils.Assert(target_acquired, "Unable to instrument assertion: " + assertion.ToString() + " at label " + label);
@@ -290,7 +298,7 @@ namespace CfiVerifier
                 new_prog.Emit(ttw);
                 Utils.ParseString(sw.ToString(), out new_prog);
                 Console.WriteLine("Now analysing split {0}.", impl_counter);
-                (new TaintPreserver(new_prog, new Tuple<string, AssertCmd>(assertion.Item1, assertion.Item3), impl_counter)).Visit(new_prog);
+                (new Slicer(new_prog, new Tuple<string, AssertCmd>(assertion.Item1, assertion.Item3), impl_counter)).Visit(new_prog);
                 sw.Close();
                 ttw.Close();
                 ttw = new TokenTextWriter(filename);
