@@ -161,7 +161,7 @@ namespace CfiVerifier
             }
         }
 
-        Dictionary<int, bool> shared_result_struct;
+        System.Collections.Concurrent.ConcurrentDictionary<int, bool> shared_result_struct;
         public Dictionary<Tuple<string, Cmd, AssertCmd>, bool> VerifyInstrumentedProcedures(Program prog)
         {
             Dictionary<Tuple<string, Cmd, AssertCmd, SlashVerifyCmdType>, int> intermediate = new Dictionary<Tuple<string, Cmd, AssertCmd, SlashVerifyCmdType>, int>();
@@ -194,7 +194,7 @@ namespace CfiVerifier
                 numAssertions++;
             }
 
-            shared_result_struct = new Dictionary<int, bool>();
+            shared_result_struct = new System.Collections.Concurrent.ConcurrentDictionary<int, bool>();
 
             //Parallel.For(0, numAssertions, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, i => CheckAssertion(i));
 
@@ -238,7 +238,8 @@ namespace CfiVerifier
         {
             string args = Options.outputPath + @"/" + Options.splitFilesDir + @"/intermediate_" + i.ToString() + ".bpl /timeLimit:10 /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0 /errorLimit:1";
             bool boogie_result = ExecuteBoogieBinary(args);
-            shared_result_struct.Add(i, boogie_result);
+            Utils.Assert(!shared_result_struct.ContainsKey(i), "Memory access already verified.");
+            shared_result_struct.AddOrUpdate(i, boogie_result, (x,y) => false);
         }
 
         public void PrintAssertionTypes()

@@ -91,7 +91,10 @@ namespace CfiDriver
 
               if (attributes.numSplits < 0)
               {
+                  TextWriter tw = new StreamWriter(resultFileName, true);
+                  tw.WriteLine("Benchmark " + benchmark.Item1 + " did not generate any assertions");
                   Console.WriteLine("Benchmark " + benchmark.Item1 + " did not generate any assertions");
+                  tw.Close();
                   continue;
               }
               Console.WriteLine("\tFOUND {0} assertions in benchmark {1}, Running them in parallel...", 
