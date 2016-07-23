@@ -58,16 +58,15 @@
     <Compile Include="source\HavocingAdversary.cs" />
     <Compile Include="source\LoopDetector.cs" />
     <Compile Include="source\LoopInvariants.cs" />
-    <Compile Include="source\main.cs" />
+    <Compile Include="source\Main.cs" />
     <Compile Include="source\ModularVerificationSetup.cs" />
-    <Compile Include="source\options.cs" />
+    <Compile Include="source\Options.cs" />
     <Compile Include="source\ProofObligations.cs" />
     <Compile Include="source\SpecialInstructionLifter.cs" />
     <Compile Include="source\SplitMemoryModeler.cs" />
     <Compile Include="source\StackSizeEstimator.cs" />
     <Compile Include="source\Slicer.cs" />
-    <Compile Include="source\utils.cs" />
-    <Compile Include="source\vc.cs" />
+    <Compile Include="source\Utils.cs" />
     <Compile Include="source\VCSplitter.cs" />
   </ItemGroup>
   <ItemGroup>
