@@ -96,51 +96,26 @@ namespace CfiVerifier
         {
             this._prog = node;
 
-            this.load_64 = node.Functions.FirstOrDefault(f => f.Name.Equals("LOAD_LE_64"));
-            Utils.Assert(this.load_64 != null, "Could not find LOAD_LE_64(.,.) function");
-            this.lt_64 = node.Functions.FirstOrDefault(f => f.Name.Equals("LT_64"));
-            Utils.Assert(this.lt_64 != null, "Could not find LT_64(.,.) function");
-            this.ge_64 = node.Functions.FirstOrDefault(f => f.Name.Equals("GE_64"));
-            Utils.Assert(this.ge_64 != null, "Could not find GE_64(.,.) function");
-            this.minus_64 = node.Functions.FirstOrDefault(f => f.Name.Equals("MINUS_64"));
-            Utils.Assert(this.minus_64 != null, "Could not find MINUS_64(.,.) function");
-            this.writable = node.Functions.FirstOrDefault(f => f.Name.Equals("writable"));
-            Utils.Assert(this.writable != null, "Could not find writable(.,.) function");
-            this.addrInStack = node.Functions.FirstOrDefault(f => f.Name.Equals("addrInStack"));
-            Utils.Assert(this.addrInStack != null, "Could not find addrInStack(.) function");
+            this.load_64 = Utils.FindFunctionInProgram(node, "LOAD_LE_64");
+            this.lt_64 = Utils.FindFunctionInProgram(node, "LT_64");
+            this.ge_64 = Utils.FindFunctionInProgram(node, "GE_64");
+            this.minus_64 = Utils.FindFunctionInProgram(node, "MINUS_64");
+            this.writable = Utils.FindFunctionInProgram(node, "writable");
+            this.addrInStack = Utils.FindFunctionInProgram(node, "addrInStack");
 
-            this._guard_writeTable_ptr = node.Constants.FirstOrDefault(c => c.Name.Equals("_guard_writeTable_ptr"));
-            Utils.Assert(this._guard_writeTable_ptr != null, "Could not find _guard_writeTable_ptr constant");
-            this._guard_callTable_ptr = node.Constants.FirstOrDefault(c => c.Name.Equals("_guard_callTable_ptr"));
-            Utils.Assert(this._guard_callTable_ptr != null, "Could not find _guard_callTable_ptr constant");
-            this._bitmap_low = node.Constants.FirstOrDefault(c => c.Name.Equals("_bitmap_low"));
-            Utils.Assert(this._bitmap_low != null, "Could not find _bitmap_low constant");
-            this._bitmap_high = node.Constants.FirstOrDefault(c => c.Name.Equals("_bitmap_high"));
-            Utils.Assert(this._bitmap_high != null, "Could not find _bitmap_high constant");
-            this._stack_low = node.Constants.FirstOrDefault(c => c.Name.Equals("_stack_low"));
-            Utils.Assert(this._stack_low != null, "Could not find _stack_low constant");
-            this._stack_high = node.Constants.FirstOrDefault(c => c.Name.Equals("_stack_high"));
-            Utils.Assert(this._stack_high != null, "Could not find _stack_high constant");
-            this._virtual_address_space_low = node.Constants.FirstOrDefault(c => c.Name.Equals("_virtual_address_space_low"));
-            Utils.Assert(this._virtual_address_space_low != null, "Could not find _virtual_address_space_low constant");
-            this._virtual_address_space_high = node.Constants.FirstOrDefault(c => c.Name.Equals("_virtual_address_space_high"));
-            Utils.Assert(this._virtual_address_space_high != null, "Could not find _virtual_address_space_high constant");
-            this.mem = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("mem"));
-            Utils.Assert(this.mem != null, "Could not find mem variable");
-            if (Options.splitMemoryModel)
-            {
-                this.mem_stack = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("mem_stack"));
-                Utils.Assert(this.mem_stack != null, "Could not find mem_stack variable");
-                this.mem_bitmap = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("mem_bitmap"));
-                Utils.Assert(this.mem_bitmap != null, "Could not find mem_bitmap variable");
-            }
-            else
-            {
-                this.mem_bitmap = this.mem;
-                this.mem_stack = this.mem;
-            }
-            this.RSP = node.GlobalVariables.FirstOrDefault(x => x.Name.Equals("RSP"));
-            Utils.Assert(this.RSP != null, "Could not find RSP variable");
+            this._guard_writeTable_ptr = Utils.FindConstantInProgram(node, "_guard_writeTable_ptr");
+            this._guard_callTable_ptr = Utils.FindConstantInProgram(node, "_guard_callTable_ptr");
+            this._bitmap_low = Utils.FindConstantInProgram(node, "_bitmap_low");
+            this._bitmap_high = Utils.FindConstantInProgram(node, "_bitmap_high");
+            this._stack_low = Utils.FindConstantInProgram(node, "_stack_low");
+            this._stack_high = Utils.FindConstantInProgram(node, "_stack_high");
+            this._virtual_address_space_low = Utils.FindConstantInProgram(node, "_virtual_address_space_low");
+            this._virtual_address_space_high = Utils.FindConstantInProgram(node, "_virtual_address_space_high");
+
+            this.mem = Utils.FindGlobalVariableInProgram(node, "mem");
+            this.mem_stack = (Options.splitMemoryModel) ? Utils.FindGlobalVariableInProgram(node, "mem_stack") : this.mem;
+            this.mem_bitmap = (Options.splitMemoryModel) ? Utils.FindGlobalVariableInProgram(node, "mem_bitmap") : this.mem;
+            this.RSP = Utils.FindGlobalVariableInProgram(node, "RSP");
 
             this.triggerFn = node.Functions.FirstOrDefault(f => f.Name.Equals("T"));
             if (this.triggerFn == null)
