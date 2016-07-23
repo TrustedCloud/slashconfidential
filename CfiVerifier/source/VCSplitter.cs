@@ -248,10 +248,6 @@ namespace CfiVerifier
             {
                 switch (x)
                 {
-                    case SlashVerifyCmdType.Load8: { return "LOAD8"; }
-                    case SlashVerifyCmdType.Load16: { return "LOAD16"; }
-                    case SlashVerifyCmdType.Load32: { return "LOAD32"; }
-                    case SlashVerifyCmdType.Load64: { return "LOAD64"; }
                     case SlashVerifyCmdType.Store8: { return "STORE8"; }
                     case SlashVerifyCmdType.Store16: { return "STORE16"; }
                     case SlashVerifyCmdType.Store32: { return "STORE32"; }

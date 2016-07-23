@@ -20,8 +20,10 @@ namespace CfiVerifier
     public enum SlashVerifyCmdType
     {
         None,
-        Load8, Load16, Load32, Load64,
-        Store8, Store16, Store32, Store64,
+        Store8,
+        Store16,
+        Store32,
+        Store64,
         RepStosB,
         Call,
         Ret,
@@ -33,9 +35,6 @@ namespace CfiVerifier
     static class Utils
     {
 
-        public static bool verbosityLevel(int level) { return (Options.verbose >= level); }  
-
-        #region Various Boogie utilities
         public static void Assert(bool b, string msg = "")
         {
             if (!b) throw new Exception("assertion failure: " + msg);
@@ -120,8 +119,6 @@ namespace CfiVerifier
             return true;
         }
 
-        #endregion
-
         public static LocalVariable MkLocalVar(string v, BType t)
         {
             return new LocalVariable(Token.NoToken, new TypedIdent(Token.NoToken, v, t));
@@ -164,15 +161,7 @@ namespace CfiVerifier
             AssignLhs lhs = c.Lhss[0];
             Expr rhs = c.Rhss[0];
 
-            if (lhs.Type.IsBv && RhsMatch(rhs, "LOAD_LE_8")) { return SlashVerifyCmdType.Load8; }
-            else if (lhs.Type.IsBv && RhsMatch(rhs, "LOAD_LE_16")) { return SlashVerifyCmdType.Load16; }
-            else if (lhs.Type.IsBv && RhsMatch(rhs, "LOAD_LE_32")) { return SlashVerifyCmdType.Load32; }
-            else if (lhs.Type.IsBv && RhsMatch(rhs, "LOAD_LE_64")) { return SlashVerifyCmdType.Load64; }
-            else if (lhs.Type.IsBv && getNestedFunctions(rhs).Any(x => x.FunctionName.Equals("LOAD_LE_8"))) { return SlashVerifyCmdType.Load8; }
-            else if (lhs.Type.IsBv && getNestedFunctions(rhs).Any(x => x.FunctionName.Equals("LOAD_LE_16"))) { return SlashVerifyCmdType.Load16; }
-            else if (lhs.Type.IsBv && getNestedFunctions(rhs).Any(x => x.FunctionName.Equals("LOAD_LE_32"))) { return SlashVerifyCmdType.Load32; }
-            else if (lhs.Type.IsBv && getNestedFunctions(rhs).Any(x => x.FunctionName.Equals("LOAD_LE_64"))) { return SlashVerifyCmdType.Load64; }
-            else if (lhs.Type.IsMap && RhsMatch(rhs, "STORE_LE_8")) { return SlashVerifyCmdType.Store8; }
+            if (lhs.Type.IsMap && RhsMatch(rhs, "STORE_LE_8")) { return SlashVerifyCmdType.Store8; }
             else if (lhs.Type.IsMap && RhsMatch(rhs, "STORE_LE_16")) { return SlashVerifyCmdType.Store16; }
             else if (lhs.Type.IsMap && RhsMatch(rhs, "STORE_LE_32")) { return SlashVerifyCmdType.Store32; }
             else if (lhs.Type.IsMap && RhsMatch(rhs, "STORE_LE_64")) { return SlashVerifyCmdType.Store64; }
