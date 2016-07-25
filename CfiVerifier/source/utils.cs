@@ -27,9 +27,9 @@ namespace CfiVerifier
         RepStosB,
         Call,
         Ret,
-        Jmp,
-        SetRSP,
-        RemoteJmp
+        RemoteJmp,
+        RemoteIndirectJmp,
+        SetRSP
     };
 
     static class Utils
@@ -150,23 +150,77 @@ namespace CfiVerifier
 
 
         /* looks at the function used in the NAryExpr to determine the type: LOAD8, LOAD16,...,STORE64 */
-        public static SlashVerifyCmdType getSlashVerifyCmdType(AssignCmd c)
+        public static SlashVerifyCmdType getSlashVerifyCmdType(Cmd c)
         {
             Func<Expr, string, bool> RhsMatch = delegate(Expr x, String s)
             {
                 return (x is NAryExpr && ((NAryExpr) x).Fun.FunctionName.Equals(s));
             };
 
-            Utils.Assert(c.Lhss.Count == 1 && c.Rhss.Count == 1, "getSlashVerifyCmdType not handling parallel assignCmds");
-            AssignLhs lhs = c.Lhss[0];
-            Expr rhs = c.Rhss[0];
+            if (c is AssignCmd)
+            {
+                AssignCmd ac = c as AssignCmd;
 
-            if (lhs.Type.IsMap && RhsMatch(rhs, "STORE_LE_8")) { return SlashVerifyCmdType.Store8; }
-            else if (lhs.Type.IsMap && RhsMatch(rhs, "STORE_LE_16")) { return SlashVerifyCmdType.Store16; }
-            else if (lhs.Type.IsMap && RhsMatch(rhs, "STORE_LE_32")) { return SlashVerifyCmdType.Store32; }
-            else if (lhs.Type.IsMap && RhsMatch(rhs, "STORE_LE_64")) { return SlashVerifyCmdType.Store64; }
-            else if (lhs.Type.IsMap && RhsMatch(rhs, "REP_STOSB")) { return SlashVerifyCmdType.RepStosB; }
-            else { return SlashVerifyCmdType.None; }
+                Utils.Assert(ac.Lhss.Count == 1 && ac.Rhss.Count == 1, "getSlashVerifyCmdType not handling parallel assignCmds");
+                AssignLhs lhs = ac.Lhss[0];
+                Expr rhs = ac.Rhss[0];
+
+                if (lhs.Type.IsMap && RhsMatch(rhs, "STORE_LE_8")) 
+                { 
+                    return SlashVerifyCmdType.Store8; 
+                }
+                else if (lhs.Type.IsMap && RhsMatch(rhs, "STORE_LE_16")) 
+                { 
+                    return SlashVerifyCmdType.Store16; 
+                }
+                else if (lhs.Type.IsMap && RhsMatch(rhs, "STORE_LE_32")) 
+                { 
+                    return SlashVerifyCmdType.Store32; 
+                }
+                else if (lhs.Type.IsMap && RhsMatch(rhs, "STORE_LE_64")) 
+                { 
+                    return SlashVerifyCmdType.Store64; 
+                }
+                else if (lhs.Type.IsMap && RhsMatch(rhs, "REP_STOSB")) 
+                { 
+                    return SlashVerifyCmdType.RepStosB; 
+                }
+                else if (lhs.Type.IsBv && lhs.DeepAssignedIdentifier.Name.Equals("RSP")) 
+                { 
+                    return SlashVerifyCmdType.SetRSP; 
+                }
+            }
+            else if (c is AssertCmd)
+            {
+                AssertCmd ac = c as AssertCmd;
+
+                //extract instruction type
+                string attribute_cmdtype = QKeyValue.FindStringAttribute(ac.Attributes, "SlashVerifyCommandType");
+                string attribute_jmptarget = QKeyValue.FindStringAttribute(ac.Attributes, "SlashVerifyJmpTarget");
+
+                if (attribute_cmdtype != null && 
+                    attribute_cmdtype.Equals("ret")) 
+                { 
+                    return SlashVerifyCmdType.Ret;
+                }
+                else if (attribute_cmdtype != null && 
+                    attribute_cmdtype.Equals("call")) 
+                { 
+                    return SlashVerifyCmdType.Call; 
+                }
+                else if (attribute_cmdtype != null && attribute_jmptarget != null && 
+                    attribute_cmdtype.Equals("remotejmp")) 
+                { 
+                    return SlashVerifyCmdType.RemoteJmp; 
+                }
+                else if (attribute_cmdtype != null && attribute_jmptarget != null && 
+                    attribute_cmdtype.Equals("indirectjmp") && attribute_jmptarget.Equals("remote")) 
+                { 
+                    return SlashVerifyCmdType.RemoteIndirectJmp; 
+                }
+            }
+
+            return SlashVerifyCmdType.None; 
         }
 
         //input must be a load expression

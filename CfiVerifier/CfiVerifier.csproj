@@ -54,6 +54,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Properties\assemblyInfo.cs" />
+    <Compile Include="source\Validator.cs" />
     <Compile Include="source\DeadCodeEliminator.cs" />
     <Compile Include="source\HavocingAdversary.cs" />
     <Compile Include="source\LoopDetector.cs" />

@@ -30,29 +30,25 @@ namespace CfiVerifier
 
                 try
                 {
-                    Dictionary<Tuple<string, Cmd, AssertCmd>, bool> storeDB = null, loadDB = null;
+                    if (!Utils.ParseProgram(f, out prog)) return;
+                    impl = prog.TopLevelDeclarations.Where(x => x is Implementation &&
+                        ((Implementation)x).Name.Contains("dll_func")).ElementAt(0) as Implementation;
+                    Utils.Assert(impl != null, "Unable to find Boogie implementation named \"dll_func\"");
+
+                    //Phase 0
+                    (new Validator()).Visit(prog);
+
                     //Phase 1
-                    if (Options.optimizeStoreITE)
-                    {
-                        if (!Utils.ParseProgram(f, out prog)) return;
-                        impl = prog.TopLevelDeclarations.Where(x => x is Implementation &&
-                            ((Implementation)x).Name.Contains("dll_func")).ElementAt(0) as Implementation;
-                        Utils.Assert(impl != null, "Unable to find Boogie implementation named \"dll_func\"");
+                    Dictionary<Tuple<string, Cmd, AssertCmd>, bool> storeDB = null, loadDB = null;
+                    if (Options.optimizeStoreITE) {
                         storeDB = DecideAddressRegions(prog, impl, true);
                     }
 
-                    if (Options.optimizeLoadITE)
-                    {
-                        if (!Utils.ParseProgram(f, out prog)) return;
-                        impl = prog.TopLevelDeclarations.Where(x => x is Implementation &&
-                            ((Implementation)x).Name.Contains("dll_func")).ElementAt(0) as Implementation;
+                    if (Options.optimizeLoadITE) {
                         loadDB = DecideAddressRegions(prog, impl, false);
                     }
 
                     //Phase 2
-                    if (!Utils.ParseProgram(f, out prog)) return;
-                    impl = prog.TopLevelDeclarations.Where(x => x is Implementation &&
-                        ((Implementation)x).Name.Contains("dll_func")).ElementAt(0) as Implementation;
                     InstrumentEnclave(prog, impl, storeDB, loadDB);
                 }
                 catch (Exception e)

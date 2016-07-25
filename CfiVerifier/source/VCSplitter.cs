@@ -253,8 +253,8 @@ namespace CfiVerifier
                     case SlashVerifyCmdType.Store32: { return "STORE32"; }
                     case SlashVerifyCmdType.Store64: { return "STORE64"; }
                     case SlashVerifyCmdType.Call: { return "CALL"; }
-                    case SlashVerifyCmdType.Jmp: { return "JMP"; }
                     case SlashVerifyCmdType.RemoteJmp: { return "REMOTEJMP"; }
+                    case SlashVerifyCmdType.RemoteIndirectJmp: { return "REMOTEINDIRECTJMP"; }
                     case SlashVerifyCmdType.RepStosB: { return "REPSTOSB"; }
                     case SlashVerifyCmdType.Ret: { return "RET"; }
                     case SlashVerifyCmdType.SetRSP: { return "SETRSP"; }
