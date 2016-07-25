@@ -17,6 +17,19 @@ namespace CfiVerifier
 {
     class CfiVerifierMain
     {
+        static void ExtractProgAndImpl(string fname, out Program prog, out Implementation impl)
+        {
+            if (!Utils.ParseProgram(fname, out prog)) {
+                Utils.Assert(false, "Unable to parse file " + fname);
+            }
+            
+            impl = prog.TopLevelDeclarations.Where(x => x is Implementation &&
+                ((Implementation)x).Name.Contains("dll_func")).ElementAt(0) as Implementation;
+
+            Utils.Assert(impl != null, "Unable to find Boogie implementation named \"dll_func\"");
+
+        }
+
         static void Main(string[] args)
         {
             /* Command line parsing */
@@ -30,25 +43,27 @@ namespace CfiVerifier
 
                 try
                 {
-                    if (!Utils.ParseProgram(f, out prog)) return;
-                    impl = prog.TopLevelDeclarations.Where(x => x is Implementation &&
-                        ((Implementation)x).Name.Contains("dll_func")).ElementAt(0) as Implementation;
-                    Utils.Assert(impl != null, "Unable to find Boogie implementation named \"dll_func\"");
-
+                    // NOTE: Below, we have to reextract prog and impl because we want to purge the instrumentation from the previous phase
                     //Phase 0
+                    ExtractProgAndImpl(f, out prog, out impl);
                     (new Validator()).Visit(prog);
 
                     //Phase 1
                     Dictionary<Tuple<string, Cmd, AssertCmd>, bool> storeDB = null, loadDB = null;
-                    if (Options.optimizeStoreITE) {
+                    if (Options.optimizeStoreITE) 
+                    {
+                        ExtractProgAndImpl(f, out prog, out impl);
                         storeDB = DecideAddressRegions(prog, impl, true);
                     }
 
-                    if (Options.optimizeLoadITE) {
+                    if (Options.optimizeLoadITE) 
+                    {
+                        ExtractProgAndImpl(f, out prog, out impl);
                         loadDB = DecideAddressRegions(prog, impl, false);
                     }
 
                     //Phase 2
+                    ExtractProgAndImpl(f, out prog, out impl);
                     InstrumentEnclave(prog, impl, storeDB, loadDB);
                 }
                 catch (Exception e)
