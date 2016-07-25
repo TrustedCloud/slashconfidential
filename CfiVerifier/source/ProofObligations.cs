@@ -442,7 +442,9 @@ namespace CfiVerifier
                     Expr precondition =
                         Expr.And(Expr.Eq(new BvExtractExpr(Token.NoToken, new IdentifierExpr(Token.NoToken, RSP), 3, 0), new LiteralExpr(Token.NoToken, BigNum.FromInt(0), 3)),
                                  Expr.Eq(new IdentifierExpr(Token.NoToken, RSP), new OldExpr(Token.NoToken, new IdentifierExpr(Token.NoToken, RSP))));
-                    assertions.Add(new AssertCmd(Token.NoToken, Expr.Imp(precondition, addr_not_writable)));
+                    assertions.Add(new AssertCmd(Token.NoToken, 
+                        Expr.Imp(precondition, addr_not_writable), 
+                        new QKeyValue(Token.NoToken, "return_instrumentation", new List<object> { addr }, null)));
                     
                     addr_offset += 8;
                 }

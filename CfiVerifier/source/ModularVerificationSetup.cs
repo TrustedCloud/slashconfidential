@@ -610,7 +610,7 @@ namespace CfiVerifier
                                 addr_offset += 8;
                             }
                             //assume T_fresh_n(old(rsp - 8) /\ T_fresh_n(rsp - 16) /\ ...
-                            newCmdSeq.Add(new AssumeCmd(Token.NoToken, instantiation));
+                            newCmdSeq.Add(new AssumeCmd(Token.NoToken, instantiation, new QKeyValue(Token.NoToken, "call_func_trigger_declaration", new List<object> {"T_fresh_" + (this.mem_var_count - 1)}, null)));
                         }
 
 
