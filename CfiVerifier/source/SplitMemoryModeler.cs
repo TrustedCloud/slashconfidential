@@ -185,15 +185,15 @@ namespace CfiVerifier
                                 newCmdSeq.Add(assertion);
                                 VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion, Utils.getSlashVerifyCmdType(ac));
 
-                                Expr addr_in_mem =
-                                    Expr.And(
-                                        new NAryExpr(Token.NoToken, new FunctionCall(ge_64),
-                                            new List<Expr>() { store_addr, new IdentifierExpr(Token.NoToken, this.stack_low) }),
-                                        new NAryExpr(Token.NoToken, new FunctionCall(lt_64),
-                                            new List<Expr>() { store_addr, new IdentifierExpr(Token.NoToken, this.bitmap_low) }));
-                                assertion = new AssertCmd(Token.NoToken, addr_in_mem);
-                                newCmdSeq.Add(assertion);
-                                VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion, Utils.getSlashVerifyCmdType(ac));
+                                //Expr addr_in_mem =
+                                //    Expr.And(
+                                //        new NAryExpr(Token.NoToken, new FunctionCall(ge_64),
+                                //            new List<Expr>() { store_addr, new IdentifierExpr(Token.NoToken, this.stack_low) }),
+                                //        new NAryExpr(Token.NoToken, new FunctionCall(lt_64),
+                                //            new List<Expr>() { store_addr, new IdentifierExpr(Token.NoToken, this.bitmap_low) }));
+                                //assertion = new AssertCmd(Token.NoToken, addr_in_mem);
+                                //newCmdSeq.Add(assertion);
+                                //VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion, Utils.getSlashVerifyCmdType(ac));
 
                                 break;
                             }
@@ -288,10 +288,10 @@ namespace CfiVerifier
             return isRegionAddress(label, c, "addrInBitmap", db);
         }
 
-        private bool isMemAddress(string label, Cmd c, Dictionary<Tuple<string, Cmd, AssertCmd>, bool> db)
-        {
-            return isRegionAddress(label, c, "GE_64", db);
-        }
+        //private bool isMemAddress(string label, Cmd c, Dictionary<Tuple<string, Cmd, AssertCmd>, bool> db)
+        //{
+        //    return isRegionAddress(label, c, "GE_64", db);
+        //}
 
         //takes an expression and substitutes desired mem for each load(mem,..) sub-expression
         private Expr splitMemoryOnAllLoads(Expr e, AddrType addrType)
@@ -419,7 +419,7 @@ namespace CfiVerifier
                                 {
                                     if (isStackAddress(this.current_label, c, this.storeAddressRegionDB)) { addrType = AddrType.StackAddress; }
                                     else if (isBitmapAddress(this.current_label, c, this.storeAddressRegionDB)) { addrType = AddrType.BitmapAddress; }
-                                    else if (isMemAddress(this.current_label, c, this.storeAddressRegionDB)) { addrType = AddrType.MemAddress; }
+                                    //else if (isMemAddress(this.current_label, c, this.storeAddressRegionDB)) { addrType = AddrType.MemAddress; }
                                     else { addrType = AddrType.Unknown; }
                                 }
 
@@ -468,7 +468,7 @@ namespace CfiVerifier
 
                                     newCmdSeq.Add(ac);
                                     newCmdSeq.Add(stack_ac);
-                                    if (addrType == AddrType.Unknown) { newCmdSeq.Add(bitmap_ac); } //if going to mem, then no need to update bitmaps
+                                    newCmdSeq.Add(bitmap_ac);
                                 }
 
                                 break;
