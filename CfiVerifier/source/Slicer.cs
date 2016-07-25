@@ -16,22 +16,22 @@ using BType = Microsoft.Boogie.Type;
 
 namespace CfiVerifier 
 {
-    class Slicer : StandardVisitor
+    public class Slicer : StandardVisitor
     {
         private Program prog;
         private Implementation impl;
         private AssertCmd source_assert;
-        private int count;
+        private Expr return_instrumentation_address = null;
+        private List<Function> call_trigger_functions = new List<Function>();
     
         private HashSet<Cmd> keep_set;
         private Dictionary<Cmd, HashSet<Variable>> live_set;
     
-        public Slicer(Program prog, Tuple<string, AssertCmd> assertion_info, int count)
+        public Slicer(Program prog)
         {
             Utils.Assert(prog.Implementations.Count() == 1, "Expecting a single implementation");
             this.impl = prog.Implementations.ElementAt(0);
             this.prog = prog;
-            this.count = count;
             this.live_set = new Dictionary<Cmd, HashSet<Variable>>();
             this.keep_set = new HashSet<Cmd>();
             foreach (Block b in this.impl.Blocks)
@@ -39,10 +39,27 @@ namespace CfiVerifier
                 foreach (Cmd c in b.Cmds)
                 {
                     this.live_set.Add(c, new HashSet<Variable>());
-                    if (c is AssertCmd && QKeyValue.FindBoolAttribute((c as AssertCmd).Attributes, "source_assert"))
-  //                  if (c.GetHashCode().Equals(assertion_info.Item2.GetHashCode()))
- //                   if (b.Label == assertion_info.Item1 && c is AssertCmd && (c as AssertCmd).Expr.ToString() == assertion_info.Item2.Expr.ToString())
-                        this.source_assert = c as AssertCmd;
+                    if (c is AssertCmd)
+                    {
+                        if (QKeyValue.FindBoolAttribute((c as AssertCmd).Attributes, "source_assert"))
+                        {
+                            this.source_assert = c as AssertCmd;
+                        }
+                        Expr return_instrumentation_addr = QKeyValue.FindExprAttribute((c as AssertCmd).Attributes, "return_instrumentation");
+                        if (return_instrumentation_addr != null)
+                        {
+                            Utils.Assert(this.return_instrumentation_address == null);
+                            this.return_instrumentation_address = return_instrumentation_addr;
+                        }
+                    }
+                    if (c is AssumeCmd)
+                    {
+                        string trigger_func_name = QKeyValue.FindStringAttribute((c as AssumeCmd).Attributes, "call_func_trigger_declaration");
+                        if (trigger_func_name != null)
+                        {
+                            this.call_trigger_functions.Add(Utils.FindFunctionInProgram(this.prog, trigger_func_name));
+                        }
+                    }
                 }
             }
             Utils.Assert(this.source_assert != null);
@@ -140,7 +157,6 @@ namespace CfiVerifier
                 }
                 Utils.Assert(this.live_set[prev_cmd].Count >= size_before);
                 if (this.live_set[prev_cmd].Count > size_before || this.keep_set.Contains(prev_cmd) != keep_before) {
-                //Console.WriteLine("Changing {0} -- {1}.", this_cmd.ToString(), prev_cmd.ToString());
                 changed = true;
                 }
             }
@@ -244,7 +260,15 @@ namespace CfiVerifier
             List<System.Type> removedCmdTypes = new List<System.Type>() {typeof(AssignCmd)};
             foreach (Cmd c in cmdSeq)
             {
-                if (!removedCmdTypes.Contains(c.GetType()) || this.keep_set.Contains(c))
+                string fresh_func_name;
+                if (this.return_instrumentation_address != null && c is AssumeCmd
+                    && (fresh_func_name = QKeyValue.FindStringAttribute((c as AssumeCmd).Attributes, "call_func_trigger_declaration")) != null)
+                {
+                    Function fresh_func = this.call_trigger_functions.Where(i => i.Name.Equals(fresh_func_name)).First();
+                    Utils.Assert(fresh_func != null);
+                    newCmdSeq.Add(new AssumeCmd(Token.NoToken, new NAryExpr(Token.NoToken, new FunctionCall(fresh_func), new List<Expr> { this.return_instrumentation_address })));
+                }
+                else if (!removedCmdTypes.Contains(c.GetType()) || this.keep_set.Contains(c))
                 {
                     newCmdSeq.Add(c);
                 }
