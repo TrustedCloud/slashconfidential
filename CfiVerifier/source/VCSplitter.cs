@@ -203,7 +203,7 @@ namespace CfiVerifier
             for (int i = 0; i < numAssertions; i++) workItems.Add(i);
 
             var threads = new List<Thread>();
-            for (int i = 0; i < Environment.ProcessorCount; i++)
+            for (int i = 0; i < Environment.ProcessorCount * 0.5; i++)
             {
                 threads.Add(new Thread(new ThreadStart(CheckAssertions)));
             }
