@@ -169,7 +169,7 @@ namespace CfiVerifier
                 referenced_vars.UnionWith(GetReferencedVars((c as AssignCmd).Lhss.First().AsExpr));
                 foreach (Expr rhs in (c as AssignCmd).Rhss)
                 {
-                referenced_vars.UnionWith(GetReferencedVars(rhs));
+                    referenced_vars.UnionWith(GetReferencedVars(rhs));
                 }
                 return referenced_vars;
             }
@@ -231,7 +231,9 @@ namespace CfiVerifier
             LiteralExpr policy_target = null;
             if (this.source_assert.Expr is NAryExpr && ((this.source_assert.Expr) as NAryExpr).Fun.FunctionName == "policy") {
                 Utils.Assert(((this.source_assert.Expr) as NAryExpr).Args.Count == 1, "Expecting \"policy\" axiom with a single argument");
-                Utils.Assert(((this.source_assert.Expr) as NAryExpr).Args.First() is LiteralExpr, "Expecting \"policy\" axiom with a LiteralExpr argument");
+                if (!(((this.source_assert.Expr) as NAryExpr).Args.First() is LiteralExpr)) {
+                    return;
+                }
                 policy_target = ((this.source_assert.Expr) as NAryExpr).Args.First() as LiteralExpr;
             }
 
