@@ -45,27 +45,24 @@ namespace CfiVerifier
                         {
                             this.source_assert = c as AssertCmd;
                         }
-                        Expr return_instrumentation_addr = QKeyValue.FindExprAttribute((c as AssertCmd).Attributes, "return_instrumentation");
-                        if (return_instrumentation_addr != null)
-                        {
-                            Utils.Assert(this.return_instrumentation_address == null);
-                            this.return_instrumentation_address = return_instrumentation_addr;
-                        }
                     }
-                    if (c is AssumeCmd)
-                    {
-                        string trigger_func_name = QKeyValue.FindStringAttribute((c as AssumeCmd).Attributes, "call_func_trigger_declaration");
-                        if (trigger_func_name != null)
-                        {
-                            this.call_trigger_functions.Add(Utils.FindFunctionInProgram(this.prog, trigger_func_name));
-                        }
-                    }
+                    /* This command sets this.return_instrumentation_address if the source_assert is a
+                     * return type instrumentation with the corresponding attributes set; commenting
+                     * this function ensures that triggers for call instrumentation are not sliced away */
+                    IdentifyReturnInstrumentationAddress(c);
                 }
             }
             Utils.Assert(this.source_assert != null);
             this.keep_set.Add(this.source_assert);
             this.live_set[this.source_assert] = GetReferencedVars(this.source_assert);
+
+            /* This performs data-flow analysis to remove most of the instructions in the program which do not have
+             * information flowing into the source_assert; this generally affects only AssignCmd's*/
             PerformTaintAnalysisAlternate();
+
+            /* This removes unused policy axioms; in almost all cases, this will remove ALL policy axioms. The exception
+             * is when the source_assert itself asserts that an address is a policy; in this case, all but the corresponding
+             * axiom will be removed */
             SlicePolicyAxioms();
         }
         
@@ -157,7 +154,7 @@ namespace CfiVerifier
                 }
                 Utils.Assert(this.live_set[prev_cmd].Count >= size_before);
                 if (this.live_set[prev_cmd].Count > size_before || this.keep_set.Contains(prev_cmd) != keep_before) {
-                changed = true;
+                    changed = true;
                 }
             }
             return changed;
@@ -250,6 +247,27 @@ namespace CfiVerifier
                     {
                         this.prog.RemoveTopLevelDeclaration(d);
                     }
+                }
+            }
+        }
+
+        private void IdentifyReturnInstrumentationAddress(Cmd c)
+        {
+            if (c is AssertCmd) 
+            {
+                Expr return_instrumentation_addr = QKeyValue.FindExprAttribute((c as AssertCmd).Attributes, "return_instrumentation");
+                if (return_instrumentation_addr != null)
+                {
+                    Utils.Assert(this.return_instrumentation_address == null);
+                    this.return_instrumentation_address = return_instrumentation_addr;
+                }
+            }
+            else if (c is AssumeCmd)
+            {
+                string trigger_func_name = QKeyValue.FindStringAttribute((c as AssumeCmd).Attributes, "call_func_trigger_declaration");
+                if (trigger_func_name != null)
+                {
+                    this.call_trigger_functions.Add(Utils.FindFunctionInProgram(this.prog, trigger_func_name));
                 }
             }
         }

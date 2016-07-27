@@ -18,6 +18,7 @@ namespace CfiDriver
         static bool verbose = true;
         static string resultFileName = @"ResultSummary_" + DateTime.Now.Hour.ToString() + "_" 
             + DateTime.Now.Minute.ToString() + "_" + DateTime.Now.Second.ToString() + ".txt";
+        static TextWriter resultFileNameWriter = new StreamWriter(resultFileName, true);
 
         //key: directory, value: [tag, splitId, attributes, boogieResult, timeInSeconds]
         static Dictionary<string, List<Tuple<string,int,ProgramAttributes,BoogieResult,int>>> results;
@@ -54,6 +55,7 @@ namespace CfiDriver
             {
                 GenerateResultOutput(resultFileName, stats);
             }
+            resultFileNameWriter.Close();
         }
 
         public static Tuple<int, int, int> RunBenchmarks(List<Tuple<string, string, string, string>> benchmarks, bool doNotRunBenchmarks, bool splitMemory, bool optimizeStore, bool optimizeLoad)
@@ -91,10 +93,8 @@ namespace CfiDriver
 
               if (attributes.numSplits < 0)
               {
-                  TextWriter tw = new StreamWriter(resultFileName, true);
-                  tw.WriteLine("Benchmark " + benchmark.Item1 + " did not generate any assertions");
+                  resultFileNameWriter.WriteLine("Benchmark " + benchmark.Item1 + " did not generate any assertions");
                   Console.WriteLine("Benchmark " + benchmark.Item1 + " did not generate any assertions");
-                  tw.Close();
                   continue;
               }
               Console.WriteLine("\tFOUND {0} assertions in benchmark {1}, Running them in parallel...", 
@@ -236,6 +236,9 @@ namespace CfiDriver
           }
           catch (Exception e)
           {
+            resultFileNameWriter.WriteLine("Boogie exception:");
+            resultFileNameWriter.WriteLine("\tCommand -- {0} {1}", binaryName, arguments);
+            resultFileNameWriter.WriteLine("\tException -- {0} : {1}", e, e.Message);
             Console.WriteLine("\tEND Executing {0} {1} with Exception {2}", binaryName, arguments, e);
             return new Tuple<BoogieResult, int>(BoogieResult.UNKNOWN, 0);
           }
@@ -363,6 +366,9 @@ namespace CfiDriver
                 attributes.foundLoop = false;
                 attributes.numSplits = -1;
 
+                resultFileNameWriter.WriteLine("CfiVerifier exception:");
+                resultFileNameWriter.WriteLine("\tCommand -- {0} {1}", binaryName, arguments);
+                resultFileNameWriter.WriteLine("\tException -- {0} : {1}", e, e.Message);
                 Console.WriteLine("\tEND Executing {0} {1} with Exception {2}", binaryName, arguments, e);
                 return attributes;
             }
@@ -385,26 +391,23 @@ namespace CfiDriver
 
         private static void EmitBenchmarkResults(string resultFileName, string directory)
         {
-            TextWriter tw = new StreamWriter(resultFileName, true);
             List<Tuple<string, int, ProgramAttributes, BoogieResult, int>> entries = results[directory].OrderBy(x => x.Item2).ToList();
             foreach (Tuple<string, int, ProgramAttributes, BoogieResult, int> entry in entries)
             {
-                tw.WriteLine(directory + "<" + entry.Item1 + "," + entry.Item2.ToString() + "> :" +
+                resultFileNameWriter.WriteLine(directory + "<" + entry.Item1 + "," + entry.Item2.ToString() + "> :" +
                   entry.Item4 +
                   "[" + entry.Item3.assertionTypes[entry.Item2] + "]" +
                   "[blocks:" + entry.Item3.numBasicBlocks.ToString() + "]" +
                   (entry.Item3.foundLoop ? "[LOOP]" : "[NOLOOP]") + 
                   ("[time:" + entry.Item5 + "]"));
             }
-            tw.WriteLine("==== " + directory + " total duration:" + results[directory].Sum(i => i.Item5));
-            tw.Flush();
-            tw.Close();
+            resultFileNameWriter.WriteLine("==== " + directory + " total duration:" + results[directory].Sum(i => i.Item5));
+            resultFileNameWriter.Flush();
         }
 
         private static void GenerateResultOutput(string resultFileName, Tuple<int,int,int> stats)
         {
           Dictionary<string,int> sum = new Dictionary<string,int>();
-          TextWriter output = new StreamWriter(resultFileName, true); 
           foreach (string directory in results.Keys)
           {
             List<Tuple<string, int, ProgramAttributes, BoogieResult,int>> entries = results[directory].OrderBy(x => x.Item2).ToList(); // order by split id
@@ -415,13 +418,12 @@ namespace CfiDriver
           }
           foreach (string s in sum.Keys)
           {
-            output.WriteLine("[{0}]: {1}", s, sum[s]);
+            resultFileNameWriter.WriteLine("[{0}]: {1}", s, sum[s]);
           }
-          output.WriteLine("Stats Verified: {0}", stats.Item1);
-          output.WriteLine("Stats Error: {0}", stats.Item2);
-          output.WriteLine("Stats Unknown: {0}", stats.Item3);
-          output.Flush();
-          output.Close();
+          resultFileNameWriter.WriteLine("Stats Verified: {0}", stats.Item1);
+          resultFileNameWriter.WriteLine("Stats Error: {0}", stats.Item2);
+          resultFileNameWriter.WriteLine("Stats Unknown: {0}", stats.Item3);
+          resultFileNameWriter.Flush();
           Console.WriteLine("Log file saved in " + resultFileName + ".");
         }
 
