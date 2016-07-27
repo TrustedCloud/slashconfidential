@@ -28,10 +28,8 @@ namespace CfiVerifier
                 {
                     AssignCmd ac = c as AssignCmd;
                     Utils.Assert(ac.Lhss.Count == 1 && ac.Rhss.Count == 1, "Not handling parallel AssignCmd");
-                    if (Utils.getSlashVerifyCmdType(ac) == SlashVerifyCmdType.Load8 ||
-                        Utils.getSlashVerifyCmdType(ac) == SlashVerifyCmdType.Load16 ||
-                        Utils.getSlashVerifyCmdType(ac) == SlashVerifyCmdType.Load32 ||
-                        Utils.getSlashVerifyCmdType(ac) == SlashVerifyCmdType.Load64)
+
+                    if (Utils.getNestedFunctions(ac.Rhss[0]).Any(x => x.FunctionName.Contains("LOAD_LE")))
                     {
                         //__SlashVerify__tmpmem := mem; havoc mem; assume forall i: enc(i) ==> mem[i] == __SlashVerify__tmpmem[i]
                         // modeled within call __SlashVerify__MNEMAdversary();
