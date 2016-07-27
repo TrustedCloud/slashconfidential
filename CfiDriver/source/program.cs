@@ -93,7 +93,7 @@ namespace CfiDriver
 
               if (attributes.numSplits < 0)
               {
-                  resultFileNameWriter.WriteLine("Benchmark " + benchmark.Item1 + " did not generate any assertions");
+                  resultFileNameWriter.WriteLine("-- benchmark " + benchmark.Item1 + " did not generate any assertions");
                   Console.WriteLine("Benchmark " + benchmark.Item1 + " did not generate any assertions");
                   continue;
               }
