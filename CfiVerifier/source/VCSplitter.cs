@@ -170,6 +170,30 @@ namespace CfiVerifier
             foreach (Tuple<string, Cmd, AssertCmd, SlashVerifyCmdType> assertion in assertions)
             {
                 var filename = Options.outputPath + @"/" + Options.splitFilesDir + @"/intermediate_" + numAssertions.ToString() + ".bpl";
+
+                StringWriter sw = new StringWriter();
+                TokenTextWriter ttw = new TokenTextWriter(sw);
+                Program new_prog = new Program();
+                Implementation new_impl = null;
+                foreach (Declaration d in prog.TopLevelDeclarations)
+                    if (!(d is Implementation))
+                        new_prog.AddTopLevelDeclaration(d);
+                    else
+                    {
+                        new_impl = instrumentAssertion(original_impl, assertion.Item1, assertion.Item2, assertion.Item3);
+                        new_prog.AddTopLevelDeclaration(new_impl);
+                    }
+                new_prog.Emit(ttw);
+                Utils.ParseString(sw.ToString(), out new_prog);
+                (new Slicer(new_prog)).Visit(new_prog);
+                sw.Close();
+                ttw.Close();
+                ttw = new TokenTextWriter(filename);
+                new_prog.Emit(ttw);
+                ttw.Close();
+                intermediate[assertion] = numAssertions;
+                numAssertions++;
+                /*
                 var tuo = new TokenTextWriter(filename);
                 try
                 {
@@ -191,7 +215,7 @@ namespace CfiVerifier
                 }
                 //prove it using Boogie
                 intermediate[assertion] = numAssertions;
-                numAssertions++;
+                numAssertions++;*/
             }
 
             shared_result_struct = new System.Collections.Concurrent.ConcurrentDictionary<int, bool>();

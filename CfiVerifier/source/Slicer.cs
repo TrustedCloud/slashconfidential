@@ -52,7 +52,7 @@ namespace CfiVerifier
                     IdentifyReturnInstrumentationAddress(c);
                 }
             }
-            Utils.Assert(this.source_assert != null);
+            Utils.Assert(this.source_assert != null, "Unable to find source assertion");
             this.keep_set.Add(this.source_assert);
             this.live_set[this.source_assert] = GetReferencedVars(this.source_assert);
 

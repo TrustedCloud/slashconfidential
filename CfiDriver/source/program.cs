@@ -45,15 +45,18 @@ namespace CfiDriver
                 Options.timeoutPerProcess = Int32.Parse(s.Split(separators, StringSplitOptions.RemoveEmptyEntries)[1]);
             }
 
+            Stopwatch benchmarkStopwatch = new Stopwatch();
+            benchmarkStopwatch.Start();
             Tuple<int, int, int> stats = RunBenchmarks(benchmarks,
                 args.Contains("/option:norun"),
                 args.Contains("/option:splitmemory"),
                 args.Contains("/option:optimizestore"),
                 args.Contains("/option:optimizeload"));
+            benchmarkStopwatch.Stop();
 
             if (!args.Contains("/option:norun"))
             {
-                GenerateResultOutput(resultFileName, stats);
+                GenerateResultOutput(stats, benchmarkStopwatch.ElapsedMilliseconds / 1000);
             }
             resultFileNameWriter.Close();
         }
@@ -405,7 +408,7 @@ namespace CfiDriver
             resultFileNameWriter.Flush();
         }
 
-        private static void GenerateResultOutput(string resultFileName, Tuple<int,int,int> stats)
+        private static void GenerateResultOutput(Tuple<int,int,int> stats, long elapsedSeconds)
         {
           Dictionary<string,int> sum = new Dictionary<string,int>();
           foreach (string directory in results.Keys)
@@ -423,6 +426,7 @@ namespace CfiDriver
           resultFileNameWriter.WriteLine("Stats Verified: {0}", stats.Item1);
           resultFileNameWriter.WriteLine("Stats Error: {0}", stats.Item2);
           resultFileNameWriter.WriteLine("Stats Unknown: {0}", stats.Item3);
+          resultFileNameWriter.WriteLine("Total wall time (seconds): {0}", elapsedSeconds);
           resultFileNameWriter.Flush();
           Console.WriteLine("Log file saved in " + resultFileName + ".");
         }
