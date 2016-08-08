@@ -50,6 +50,8 @@ namespace CfiVerifier
                      * return type instrumentation with the corresponding attributes set; commenting
                      * this function ensures that triggers for call instrumentation are not sliced away */
                     IdentifyReturnInstrumentationAddress(c);
+
+                    
                 }
             }
             Utils.Assert(this.source_assert != null, "Unable to find source assertion");
@@ -64,6 +66,11 @@ namespace CfiVerifier
              * is when the source_assert itself asserts that an address is a policy; in this case, all but the corresponding
              * axiom will be removed */
             SlicePolicyAxioms();
+
+            //bool prevPIE = CommandLineOptions.Clo.PruneInfeasibleEdges;
+            //CommandLineOptions.Clo.PruneInfeasibleEdges = true;
+            //impl.PruneUnreachableBlocks();
+            //CommandLineOptions.Clo.PruneInfeasibleEdges = prevPIE;
         }
         
         private void PerformTaintAnalysisAlternate()
@@ -152,6 +159,11 @@ namespace CfiVerifier
                     this.live_set[prev_cmd].UnionWith(GetReferencedVars(prev_cmd));
                     this.keep_set.Add(prev_cmd);
                 }
+                if (prev_cmd is HavocCmd)
+                {
+                    this.live_set[prev_cmd].ExceptWith(GetReferencedVars(prev_cmd));
+                    this.keep_set.Add(prev_cmd);
+                }
                 Utils.Assert(this.live_set[prev_cmd].Count >= size_before);
                 if (this.live_set[prev_cmd].Count > size_before || this.keep_set.Contains(prev_cmd) != keep_before) {
                     changed = true;
@@ -180,6 +192,10 @@ namespace CfiVerifier
             else if (c is AssumeCmd)
             {
                 return GetReferencedVars((c as AssumeCmd).Expr);
+            }
+            else if (c is HavocCmd)
+            {
+                return new HashSet<Variable>((c as HavocCmd).Vars.Select(i => i.Decl));
             }
 
             Utils.Assert(false, "Unhandled Cmd type: " + c.GetType().ToString());

@@ -82,6 +82,7 @@ namespace CfiVerifier
             (new SpecialInstructionLifter()).Visit(prog);
             (new ModularVerificationSetup()).Visit(prog);
             (new EnvironmentSetup()).Visit(prog);
+            (new IndiscriminateAssumeSlicer()).Visit(prog);
 
             VCSplitter.LaunchVCSplitter(impl);
             if (store) { 
