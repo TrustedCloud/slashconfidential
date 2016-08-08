@@ -53,7 +53,7 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="IndiscriminateAssumeSlicer.cs" />
+    <Compile Include="source\IndiscriminateAssumeSlicer.cs" />
     <Compile Include="Properties\assemblyInfo.cs" />
     <Compile Include="source\Validator.cs" />
     <Compile Include="source\DeadCodeEliminator.cs" />
