@@ -102,7 +102,6 @@
     </Compile>
     <Compile Include="source\CLGraphEmitter.cs" />
     <Compile Include="source\EntryPoint.cs" />
-    <Compile Include="source\CLMemorySplitter.cs" />
     <Compile Include="source\CLSlicer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
