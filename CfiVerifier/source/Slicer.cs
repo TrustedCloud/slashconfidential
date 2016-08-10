@@ -154,7 +154,7 @@ namespace CfiVerifier
                         this.keep_set.Add(prev_cmd);
                     }
                 }
-                if (prev_cmd is AssumeCmd) 
+                if (prev_cmd is AssumeCmd && !QKeyValue.FindBoolAttribute((prev_cmd as AssumeCmd).Attributes, "partition")) 
                 {
                     this.live_set[prev_cmd].UnionWith(GetReferencedVars(prev_cmd));
                     this.keep_set.Add(prev_cmd);

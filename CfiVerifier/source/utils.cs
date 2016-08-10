@@ -32,7 +32,7 @@ namespace CfiVerifier
         SetRSP
     };
 
-    static class Utils
+    public static class Utils
     {
 
         public static void Assert(bool b, string msg = "")
