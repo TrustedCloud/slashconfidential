@@ -193,29 +193,6 @@ namespace CfiVerifier
                 ttw.Close();
                 intermediate[assertion] = numAssertions;
                 numAssertions++;
-                /*
-                var tuo = new TokenTextWriter(filename);
-                try
-                {
-                    //emit all the vars, consts, functions, axioms, and typedecls
-                    foreach (Declaration d in prog.TopLevelDeclarations)
-                    {
-                        if (!(d is Implementation))
-                        {
-                            d.Emit(tuo, 0);
-                        }
-                    }
-                    //emit the instrumented implementation
-                    Implementation new_impl = instrumentAssertion(original_impl, assertion.Item1, assertion.Item2, assertion.Item3);
-                    new_impl.Emit(tuo, 0);
-                }
-                finally
-                {
-                    tuo.Close();
-                }
-                //prove it using Boogie
-                intermediate[assertion] = numAssertions;
-                numAssertions++;*/
             }
 
             shared_result_struct = new System.Collections.Concurrent.ConcurrentDictionary<int, bool>();

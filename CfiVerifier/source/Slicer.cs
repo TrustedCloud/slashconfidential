@@ -67,6 +67,8 @@ namespace CfiVerifier
              * axiom will be removed */
             SlicePolicyAxioms();
 
+            SliceRequires();
+
             //bool prevPIE = CommandLineOptions.Clo.PruneInfeasibleEdges;
             //CommandLineOptions.Clo.PruneInfeasibleEdges = true;
             //impl.PruneUnreachableBlocks();
@@ -154,7 +156,7 @@ namespace CfiVerifier
                         this.keep_set.Add(prev_cmd);
                     }
                 }
-                if (prev_cmd is AssumeCmd && !QKeyValue.FindBoolAttribute((prev_cmd as AssumeCmd).Attributes, "partition")) 
+                if (prev_cmd is AssumeCmd /*&& !QKeyValue.FindBoolAttribute((prev_cmd as AssumeCmd).Attributes, "partition")*/) 
                 {
                     this.live_set[prev_cmd].UnionWith(GetReferencedVars(prev_cmd));
                     this.keep_set.Add(prev_cmd);
@@ -267,6 +269,54 @@ namespace CfiVerifier
                     }
                 }
             }
+        }
+
+        private void SliceRequires()
+        {
+            Procedure dll_func_proc = this.prog.Procedures.Where(i => i.Name == "dll_func").First();
+            Utils.Assert(dll_func_proc != null, "Did not find dll_func procedure in given program!");
+            foreach (Requires r in dll_func_proc.Requires.ToList())
+            {
+                Expr reqAddress = GetRequiresAddress(r);
+                if (this.return_instrumentation_address != null && reqAddress != null 
+                    && reqAddress.ComputeHashCode() != this.return_instrumentation_address.ComputeHashCode())
+                {
+                    dll_func_proc.Requires.Remove(r);
+                }
+            }
+        }
+
+        private NAryExpr GetRequiresAddress(Requires r)
+        {
+            if (!(r.Condition is NAryExpr)) 
+            {
+                return null;
+            }
+            NAryExpr conditionNary = r.Condition as NAryExpr;
+            string conditionFuncName = conditionNary.Fun.FunctionName;
+            if (conditionFuncName.Equals("!"))
+            {
+                if (conditionNary.Args.Count != 1 || !(conditionNary.Args.First() is NAryExpr)) 
+                {
+                    return null;
+                }
+                NAryExpr innerConditionNary = conditionNary.Args.First() as NAryExpr;
+                if (innerConditionNary.Fun.FunctionName != "writable" 
+                    || !((innerConditionNary.Args.Last() as NAryExpr).Fun.FunctionName.Equals("MINUS_64")))
+                {
+                    return null;
+                }
+                return innerConditionNary.Args.Last() as NAryExpr;
+            }
+            else if (conditionFuncName.Equals("T"))
+            {
+                if (!((conditionNary.Args.First()) as NAryExpr).Fun.FunctionName.Equals("MINUS_64"))
+                {
+                    return null;
+                }
+                return conditionNary.Args.First() as NAryExpr;
+            }
+            return null;
         }
 
         private void IdentifyReturnInstrumentationAddress(Cmd c)
