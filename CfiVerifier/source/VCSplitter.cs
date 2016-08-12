@@ -198,10 +198,21 @@ namespace CfiVerifier
             shared_result_struct = new System.Collections.Concurrent.ConcurrentDictionary<int, bool>();
 
             //Parallel.For(0, numAssertions, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, i => CheckAssertion(i));
+            var delim = Options.IsLinux() ? @"/" : @"\";
+            List<Tuple<string, string>> solvers = new List<Tuple<string, string>> 
+            {
+                  new Tuple<string, string>("Z3_441",
+                    @"/z3exe:." + delim + "references" + delim + "z3.4.4.1.exe /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0"),
+                  new Tuple<string, string>("Z3_440",
+                    @"/z3exe:." + delim + "references" + delim + "z3.4.4.0.exe /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0"),
+            };
 
             // work stealing parallel implementation 
-            workItems = new System.Collections.Concurrent.ConcurrentBag<int>();
-            for (int i = 0; i < numAssertions; i++) workItems.Add(i);
+            workItems = new System.Collections.Concurrent.ConcurrentBag<Tuple<string, string, int>>();
+            foreach (Tuple<string, string> solver in solvers) 
+                for (int i = 0; i < numAssertions; i++) 
+                    workItems.Add(new Tuple<string, string, int>(solver.Item1, solver.Item2, i));
+
 
             var threads = new List<Thread>();
             for (int i = 0; i < Environment.ProcessorCount * 0.5; i++)
@@ -221,26 +232,28 @@ namespace CfiVerifier
             return result;
         }
 
-        private System.Collections.Concurrent.ConcurrentBag<int> workItems;
+        private System.Collections.Concurrent.ConcurrentBag<Tuple<string, string, int>> workItems;
 
         private void CheckAssertions()
         {
             while (true)
             {
                 // grab work
-                int work;
+                Tuple<string, string, int> work;
                 if (!workItems.TryTake(out work)) break;
-
-                CheckAssertion(work);
+                if (!shared_result_struct.ContainsKey(work.Item3))
+                {
+                    CheckAssertion(work.Item1, work.Item2, work.Item3);
+                }
             }
         }
 
-        private void CheckAssertion(int i)
+        private void CheckAssertion(string solverName, string solverCallArg, int i)
         {
-            string args = Options.outputPath + @"/" + Options.splitFilesDir + @"/intermediate_" + i.ToString() + ".bpl /timeLimit:10 /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0 /errorLimit:1";
+            string args = Options.outputPath + @"/" + Options.splitFilesDir + @"/intermediate_" + i.ToString() + ".bpl " +
+                solverCallArg + @" /timeLimit:10 /errorLimit:1";
             bool boogie_result = ExecuteBoogieBinary(args);
-            Utils.Assert(!shared_result_struct.ContainsKey(i), "Memory access already verified.");
-            shared_result_struct.AddOrUpdate(i, boogie_result, (x,y) => false);
+            shared_result_struct.AddOrUpdate(i, boogie_result, (x,y) => boogie_result);
         }
 
         public void PrintAssertionTypes()

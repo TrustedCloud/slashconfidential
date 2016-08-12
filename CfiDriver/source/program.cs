@@ -21,7 +21,9 @@ namespace CfiDriver
         static TextWriter resultFileNameWriter = new StreamWriter(resultFileName, true);
 
         //key: directory, value: [tag, splitId, attributes, boogieResult, timeInSeconds]
-        static Dictionary<string, List<Tuple<string,int,ProgramAttributes,BoogieResult,int>>> results;
+        //static Dictionary<string, List<Tuple<string,int,ProgramAttributes,BoogieResult,int>>> results;
+        // results = {directory:{splitId:[tag, attributes, boogieResult, timeInSeconds]}}
+        static System.Collections.Concurrent.ConcurrentDictionary<string, SortedDictionary<int, Tuple<string,ProgramAttributes,BoogieResult,int>>> results;
         static List<Tuple<string, string, string, string>> benchmarks; //<directory, input bpl, options, run_type_name>
 
         private void Usage()
@@ -32,7 +34,8 @@ namespace CfiDriver
         static void Main(string[] args)
         {
             Console.WriteLine("Environment has {0} processors", Environment.ProcessorCount);
-            results = new Dictionary<string, List<Tuple<string, int, ProgramAttributes, BoogieResult, int>>>();
+            //results = new Dictionary<string, List<Tuple<string, int, ProgramAttributes, BoogieResult, int>>>();
+            results = new System.Collections.Concurrent.ConcurrentDictionary<string, SortedDictionary<int, Tuple<string, ProgramAttributes, BoogieResult, int>>>();
             benchmarks = new List<Tuple<string, string, string, string>>();
 
             //all benchmark options should be in options.cs to avoid changes to this file except for logic changes
@@ -134,11 +137,12 @@ namespace CfiDriver
             // results[directory].Add(Tuple.Create(tag, i, foundLoops, option, result, timeInSeconds));
             int numVerified = 0, numError = 0, numUnknown = 0;
             if (!results.ContainsKey(directory)) { return new Tuple<int, int, int>(0, 0, 0); }
-            foreach (Tuple<string, int, ProgramAttributes, BoogieResult, int> t in results[directory])
+            //foreach (Tuple<string, int, ProgramAttributes, BoogieResult, int> t in results[directory])
+            foreach (Tuple<string, ProgramAttributes, BoogieResult, int> t in results[directory].Values)
             {
-              if (t.Item4 == BoogieResult.VERIFIED) { numVerified++; }
-              if (t.Item4 == BoogieResult.ERROR) { numError++; }
-              if (t.Item4 == BoogieResult.UNKNOWN) { numUnknown++; }
+              if (t.Item3 == BoogieResult.VERIFIED) { numVerified++; }
+              if (t.Item3 == BoogieResult.ERROR) { numError++; }
+              if (t.Item3 == BoogieResult.UNKNOWN) { numUnknown++; }
             }
             return new Tuple<int, int, int>(numVerified, numError, numUnknown);
         }
@@ -150,11 +154,23 @@ namespace CfiDriver
             //Parallel.For(0, attributes.numSplits, 
             //  new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
             //  i => CheckAssertion(directory, tag, i, attributes));
-
+            var delim = Options.IsLinux() ? @"/" : @"\";
+            List<Tuple<string, string>> solvers = new List<Tuple<string, string>> 
+            {
+                  new Tuple<string, string>("Z3_441",
+                    @"/z3exe:." + delim + "references" + delim + "z3.4.4.1.exe /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0"),
+                  new Tuple<string, string>("Z3_440",
+                    @"/z3exe:." + delim + "references" + delim + "z3.4.4.0.exe /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0"),
+            };
             // work stealing parallel implementation 
             workItems = new System.Collections.Concurrent.ConcurrentBag<Tuple<string, string, int, ProgramAttributes>>();
-            for (int i = 0; i < attributes.numSplits; i++)
-                workItems.Add(Tuple.Create(directory, tag, i, attributes));
+            foreach (Tuple<string, string> solver in solvers)
+            {
+                attributes.solverName = solver.Item1;
+                attributes.solverCallArg = solver.Item2;
+                for (int i = 0; i < attributes.numSplits; i++)
+                    workItems.Add(Tuple.Create(directory, tag, i, attributes));
+            }
 
             var threads = new List<Thread>();
             for (int i = 0; i < Environment.ProcessorCount * 0.5; i++)
@@ -173,8 +189,11 @@ namespace CfiDriver
                 // grab work
                 Tuple<string, string, int, ProgramAttributes> work;
                 if (!workItems.TryTake(out work)) break;
-
-                CheckAssertion(work.Item1, work.Item2, work.Item3, work.Item4);
+                if (!results.ContainsKey(work.Item1) || !results[work.Item1].ContainsKey(work.Item3) ||
+                    results[work.Item1][work.Item3].Item3 != BoogieResult.VERIFIED)
+                {
+                    CheckAssertion(work.Item1, work.Item2, work.Item3, work.Item4);
+                }
             }
         }
 
@@ -191,11 +210,13 @@ namespace CfiDriver
 
             var delim = Options.IsLinux() ? @"/" : @"\";
 
-            string args0 = @" " + directory + delim + @"split_" + splitId.ToString() + @"." + tag + ".bpl /timeLimit:" + Options.timeoutPerProcess;
-            string args1 = args0 + @" /contractInfer /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0 /errorLimit:1";
+            string args = @" " + directory + delim + @"split_" + splitId.ToString() + @"." + tag + ".bpl " +
+                "/timeLimit:" + Options.timeoutPerProcess + " " + attributes.solverCallArg +
+                @" /contractInfer /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0 /errorLimit:1";
+            //string args1 = args0 + @" /contractInfer /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0 /errorLimit:1";
 
             //item1: error / unknown / verified, item2: time spent in boogie
-            Tuple<BoogieResult, int> args1_result = ExecuteBoogieBinary(args1);
+            Tuple<BoogieResult, int> args1_result = ExecuteBoogieBinary(args);
             RegisterResult(directory, tag, splitId, attributes, args1_result.Item1, args1_result.Item2);
 
         }
@@ -262,6 +283,8 @@ namespace CfiDriver
             public bool foundLoop; //does this benchmark program contain a loop?
             public Dictionary<int, String> assertionTypes; //what kind of statement does the assertion capture?
             public int numBasicBlocks; //number of basic blocks
+            public string solverName;
+            public string solverCallArg;
         }
 
         // first: number of assertions, second: found a loop
@@ -387,24 +410,36 @@ namespace CfiDriver
         {
           if (!results.ContainsKey(directory))
           {
-            results[directory] = new List<Tuple<string, int, ProgramAttributes, BoogieResult, int>>();
+            results[directory] = new SortedDictionary<int, Tuple<string, ProgramAttributes, BoogieResult, int>>();
           }
-          results[directory].Add(Tuple.Create(tag, splitId, attributes, result, timeInSeconds));
+          if (!results[directory].ContainsKey(splitId)) 
+          { 
+            results[directory][splitId] = Tuple.Create(tag, attributes, result, timeInSeconds);
+          }
+          else
+          {
+              if (results[directory][splitId].Item3 != BoogieResult.VERIFIED || results[directory][splitId].Item4 > timeInSeconds)
+              {
+                  results[directory][splitId] = Tuple.Create(tag, attributes, result, timeInSeconds);
+              }
+          }
         }
 
         private static void EmitBenchmarkResults(string resultFileName, string directory)
         {
-            List<Tuple<string, int, ProgramAttributes, BoogieResult, int>> entries = results[directory].OrderBy(x => x.Item2).ToList();
-            foreach (Tuple<string, int, ProgramAttributes, BoogieResult, int> entry in entries)
+            //List<Tuple<string, int, ProgramAttributes, BoogieResult, int>> entries = results[directory].OrderBy(x => x.Item2).ToList();
+            //foreach (Tuple<string, int, ProgramAttributes, BoogieResult, int> entry in entries)
+            foreach (KeyValuePair<int, Tuple<string, ProgramAttributes, BoogieResult, int>> entry in results[directory])
             {
-                resultFileNameWriter.WriteLine(directory + "<" + entry.Item1 + "," + entry.Item2.ToString() + "> :" +
-                  entry.Item4 +
-                  "[" + entry.Item3.assertionTypes[entry.Item2] + "]" +
-                  "[blocks:" + entry.Item3.numBasicBlocks.ToString() + "]" +
-                  (entry.Item3.foundLoop ? "[LOOP]" : "[NOLOOP]") + 
-                  ("[time:" + entry.Item5 + "]"));
+                resultFileNameWriter.WriteLine(directory + "<" + entry.Value.Item1 + "," + entry.Key.ToString() + "> :" +
+                  entry.Value.Item3 +
+                  "[" + entry.Value.Item2.assertionTypes[entry.Key] + "]" +
+                  "[blocks:" + entry.Value.Item2.numBasicBlocks.ToString() + "]" +
+                  (entry.Value.Item2.foundLoop ? "[LOOP]" : "[NOLOOP]") + 
+                  ("[time:" + entry.Value.Item4 + "]") +
+                  ("[solver:" + entry.Value.Item2.solverName + "]"));
             }
-            resultFileNameWriter.WriteLine("==== " + directory + " total duration:" + results[directory].Sum(i => i.Item5));
+            resultFileNameWriter.WriteLine("==== " + directory + " total duration:" + results[directory].Sum(i => i.Value.Item4));
             resultFileNameWriter.Flush();
         }
 
@@ -413,10 +448,11 @@ namespace CfiDriver
           Dictionary<string,int> sum = new Dictionary<string,int>();
           foreach (string directory in results.Keys)
           {
-            List<Tuple<string, int, ProgramAttributes, BoogieResult,int>> entries = results[directory].OrderBy(x => x.Item2).ToList(); // order by split id
-            foreach (Tuple<string, int, ProgramAttributes, BoogieResult,int> entry in entries)
+            //List<Tuple<string, int, ProgramAttributes, BoogieResult, int>> entries = results[directory].OrderBy(x => x.Item2).ToList();
+            //foreach (Tuple<string, int, ProgramAttributes, BoogieResult, int> entry in entries)
+            foreach (KeyValuePair<int, Tuple<string, ProgramAttributes, BoogieResult, int>> entry in results[directory])
             {
-                sum[entry.Item1] = !sum.ContainsKey(entry.Item1) ? entry.Item5 : sum[entry.Item1] + entry.Item5;
+                sum[entry.Value.Item1] = !sum.ContainsKey(entry.Value.Item1) ? entry.Value.Item4 : sum[entry.Value.Item1] + entry.Value.Item4;
             }
           }
           foreach (string s in sum.Keys)
