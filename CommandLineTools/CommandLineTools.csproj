@@ -86,6 +86,9 @@
     <Reference Include="BoogieVCGeneration">
       <HintPath>..\references\BoogieVCGeneration.dll</HintPath>
     </Reference>
+    <Reference Include="Provers.SMTLib">
+      <HintPath>..\references\Provers.SMTLib.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
@@ -101,6 +104,7 @@
       <DependentUpon>Settings.settings</DependentUpon>
     </Compile>
     <Compile Include="source\CLGraphEmitter.cs" />
+    <Compile Include="source\CLRemoveCodeBranches.cs" />
     <Compile Include="source\EntryPoint.cs" />
     <Compile Include="source\CLSlicer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

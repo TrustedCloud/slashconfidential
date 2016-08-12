@@ -10,7 +10,8 @@ namespace CommandLineTools
     {
         enum ProgramChoice {
             SLICE,
-            GRAPH
+            GRAPH,
+            REMOVE_CODE_BRANCHES
         }
 
         public static void Main(string[] args)
@@ -26,6 +27,10 @@ namespace CommandLineTools
                 case ProgramChoice.GRAPH:
                     System.Diagnostics.Debug.Assert(args.Length == 3);
                     CLGraphEmitter.Run(args[1], args[2]);
+                    return;
+                case ProgramChoice.REMOVE_CODE_BRANCHES:
+                    System.Diagnostics.Debug.Assert(args.Length == 3);
+                    CLRemoveCodeBranches.Run(args[1], args[2]);
                     return;
                 default:
                     throw new Exception("Not implemented");
