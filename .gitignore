@@ -2,8 +2,12 @@ CfiDriver/bin/
 CfiDriver/obj/
 CfiVerifier/bin/
 CfiVerifier/obj/
+CommandLineTools/bin/
+CommandLineTools/obj/
 split*.bpl
 intermediate*.bpl
+dll_func_instrumented.bpl
+ResultSummary*
 *.*~
 *.suo
 *.swp
