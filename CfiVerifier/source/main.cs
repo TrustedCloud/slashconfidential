@@ -107,7 +107,10 @@ namespace CfiVerifier
             Console.WriteLine("CfiVerifier found " + impl.Blocks.Count + " basic blocks");
             (new SpecialInstructionLifter()).Visit(prog);
             Utils.PrintProg(prog);
-            if (Options.splitMemoryModel) { (new SplitMemoryModeler(storeAddressRegionDB, loadAddressRegionDB)).Visit(prog); }
+            if (Options.splitMemoryModel) { 
+                (new SplitMemoryModeler(storeAddressRegionDB, loadAddressRegionDB)).Visit(prog);
+                (new HavocingLoader()).Visit(prog);
+            }
             Utils.PrintProg(prog);
             (new ModularVerificationSetup()).Visit(prog);
             Utils.PrintProg(prog);
