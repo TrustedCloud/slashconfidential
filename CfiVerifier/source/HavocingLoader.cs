@@ -60,10 +60,16 @@ namespace CfiVerifier
                 //this is a load expression
                 if ((e as NAryExpr).Fun.FunctionName.Contains("LOAD_LE"))
                 {
-                    var identifiers = Utils.getNestedVars((e as NAryExpr).Args[0]);
-                    if (!identifiers.Any(v => v.Name.Equals("mem_stack") || v.Name.Equals("mem_bitmap")))
+                    var identifiersInMemExpr = Utils.getNestedVars((e as NAryExpr).Args[0]);
+                    var identifiersInAddrExpr = Utils.getNestedVars((e as NAryExpr).Args[1]);
+
+                    //safe to abstract away if not loading from mem_stack or mem_bitmap
+                    bool fromRestOfMemory = !identifiersInMemExpr.Any(v => v.Name.Equals("mem_stack") || v.Name.Equals("mem_bitmap"));
+                    //don't havoc loading pointers from linker table
+                    bool notGuardWriteTable = identifiersInAddrExpr.Count > 0;
+
+                    if (fromRestOfMemory && notGuardWriteTable)
                     {
-                        //safe to abstract away if not loading from mem_stack or mem_bitmap
                         string[] separators = { "LOAD_LE_" };
                         int size = Int32.Parse((e as NAryExpr).Fun.FunctionName.Split(separators, StringSplitOptions.None)[1]);
                         return new IdentifierExpr(Token.NoToken, MkHavocConst(size));
