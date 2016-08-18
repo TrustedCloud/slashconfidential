@@ -372,7 +372,6 @@ namespace CfiDriver
             //commening out > 50% of each set to get a primary run
             var dirs = new List<string>()  {
                     @"benchmarks"+s+"IoVolumes"+s+"func_0000000000003620"
-                    ,@"benchmarks"+s+"IoVolumes"+s+"func_00000000000038C0"
             };
 
             var options = new List<Tuple<string, string>>()
