@@ -34,6 +34,12 @@ namespace CfiVerifier
             this.prog = prog;
             this.live_set = new Dictionary<Cmd, HashSet<Variable>>();
             this.keep_set = new HashSet<Cmd>();
+
+            bool prevPIE = CommandLineOptions.Clo.PruneInfeasibleEdges;
+            CommandLineOptions.Clo.PruneInfeasibleEdges = true;
+            impl.PruneUnreachableBlocks();
+            CommandLineOptions.Clo.PruneInfeasibleEdges = prevPIE;
+
             foreach (Block b in this.impl.Blocks)
             {
                 foreach (Cmd c in b.Cmds)
@@ -69,10 +75,6 @@ namespace CfiVerifier
 
             SliceRequires();
 
-            //bool prevPIE = CommandLineOptions.Clo.PruneInfeasibleEdges;
-            //CommandLineOptions.Clo.PruneInfeasibleEdges = true;
-            //impl.PruneUnreachableBlocks();
-            //CommandLineOptions.Clo.PruneInfeasibleEdges = prevPIE;
         }
         
         private void PerformTaintAnalysisAlternate()

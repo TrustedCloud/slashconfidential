@@ -185,6 +185,7 @@ namespace CfiVerifier
                     }
                 new_prog.Emit(ttw);
                 Utils.ParseString(sw.ToString(), out new_prog);
+                RemoveCodeBranches.Run(new_impl);
                 (new Slicer(new_prog)).Visit(new_prog);
                 sw.Close();
                 ttw.Close();
