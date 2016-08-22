@@ -334,7 +334,7 @@ namespace CfiVerifier
         //}
 
         //takes an expression and substitutes desired mem for each load(mem,..) sub-expression
-        private Expr splitMemoryOnAllLoads(Expr e, AddrType addrType, bool notBitmap, bool notStack)
+        private Expr splitMemoryOnAllLoads(Expr e, AddrType addrType, bool notStack, bool notBitmap)
         {
             //takes as input the addr expr of LOAD(mem,addr), and returns the desired expression for mem : ITE(addrInBitmap(.), mem_bitmap, ITE(..))
             Func<Expr, Expr> getDesiredMemExpr = delegate(Expr addr)
