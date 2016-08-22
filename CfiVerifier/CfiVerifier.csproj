@@ -53,7 +53,9 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="source\ConstantExpressionSimplifier.cs" />
     <Compile Include="source\HavocingLoader.cs" />
+    <Compile Include="source\PartitionAssumeSlicer.cs" />
     <Compile Include="source\RemoveCodeBranches.cs" />
     <Compile Include="source\IndiscriminateAssumeSlicer.cs" />
     <Compile Include="Properties\assemblyInfo.cs" />

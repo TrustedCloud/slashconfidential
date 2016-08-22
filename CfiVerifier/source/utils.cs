@@ -47,6 +47,19 @@ namespace CfiVerifier
             try { p.Emit(tuo); } finally { tuo.Close(); }
         }
 
+        public static void ExtractProgAndImpl(string fname, out Program prog, out Implementation impl)
+        {
+            if (!Utils.ParseProgram(fname, out prog)) {
+                Utils.Assert(false, "Unable to parse file " + fname);
+            }
+            
+            impl = prog.TopLevelDeclarations.Where(x => x is Implementation &&
+                ((Implementation)x).Name.Contains("dll_func")).ElementAt(0) as Implementation;
+
+            Utils.Assert(impl != null, "Unable to find Boogie implementation named \"dll_func\"");
+
+        }
+
         public static bool ParseProgram(string fname, out Program prog)
         {
             prog = null;
