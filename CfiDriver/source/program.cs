@@ -159,6 +159,8 @@ namespace CfiDriver
             {
                   new Tuple<string, string>("Z3_441",
                     @"/z3exe:." + delim + "references" + delim + "z3.4.4.1.exe /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0"),
+                  new Tuple<string, string>("Z3_441_OPTIMIZE_BV",
+                    @"/z3exe:." + delim + "references" + delim + "z3.4.4.1.exe /proverOpt:OPTIMIZE_FOR_BV=true"),
                   new Tuple<string, string>("Z3_440",
                     @"/z3exe:." + delim + "references" + delim + "z3.4.4.0.exe /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0"),
             };

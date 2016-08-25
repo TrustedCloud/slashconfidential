@@ -27,6 +27,8 @@ namespace CommandLineTools
             if (!processed)
                 CodeProcess(prog);
             Dictionary<Tuple<string, Cmd, AssertCmd>, bool> loadAddressRegionDB = DecideAddressRegions(prog, false);
+            Utils.ExtractProgAndImpl(inputFile, out prog, out impl);
+            Options.splitMemoryModel = true;
             (new SplitMemoryModeler(storeAddressRegionDB, loadAddressRegionDB)).Visit(prog);
 
             using (TokenTextWriter ttw = new TokenTextWriter(outputFile))

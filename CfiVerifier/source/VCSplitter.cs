@@ -154,7 +154,7 @@ namespace CfiVerifier
                 //Console.WriteLine("\tEND Executing {0} {1}", binaryName, arguments);
                 return result(output);
             }
-            catch (Exception)
+            catch (Exception e)
             {
                 //Console.WriteLine("\tEND Executing {0} {1} with Exception {2}", binaryName, arguments, e);
                 return false;
@@ -204,8 +204,8 @@ namespace CfiVerifier
             {
                   new Tuple<string, string>("Z3_441",
                     @"/z3exe:." + delim + "references" + delim + "z3.4.4.1.exe /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0"),
-                  new Tuple<string, string>("Z3_440",
-                    @"/z3exe:." + delim + "references" + delim + "z3.4.4.0.exe /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0"),
+                  /*new Tuple<string, string>("Z3_440",
+                    "/z3exe:." + delim + "references" + delim + "z3.4.4.0.exe /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0"),*/
             };
 
             // work stealing parallel implementation 
@@ -216,7 +216,7 @@ namespace CfiVerifier
 
 
             var threads = new List<Thread>();
-            for (int i = 0; i < Environment.ProcessorCount * 0.5; i++)
+            for (int i = 0; i < Environment.ProcessorCount; i++)
             {
                 threads.Add(new Thread(new ThreadStart(CheckAssertions)));
             }

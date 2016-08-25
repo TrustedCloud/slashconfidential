@@ -103,7 +103,10 @@
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
       <DependentUpon>Settings.settings</DependentUpon>
     </Compile>
+    <Compile Include="source\CLConstantExpressionSimplifier.cs" />
     <Compile Include="source\CLGraphEmitter.cs" />
+    <Compile Include="source\CLMemorySplitter.cs" />
+    <Compile Include="source\CLParitionSlicer.cs" />
     <Compile Include="source\CLRemoveCodeBranches.cs" />
     <Compile Include="source\EntryPoint.cs" />
     <Compile Include="source\CLSlicer.cs" />
