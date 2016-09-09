@@ -2,7 +2,6 @@
   Invoke Boogie as follows:
     boogie prelude.bpl proof_soundness_theorem2.bpl
       /z3opt:smt.RELEVANCY=0
-      /z3opt:smt.CASE_SPLIT=0
       /proverOpt:OPTIMIZE_FOR_BV=true
       /errorLimit:1
   Takes 21 seconds to verify on a macbook machine.
@@ -110,10 +109,6 @@
  function legal(addr: bv64) : bool;          //does addr hold the starting address of an instruction?
  function policy(addr: bv64) : bool;         //does addr hold the starting address of a procedure?
  function instructionLength(addr: bv64) : bv64; //how many bytes does the instruction at addr occupy?
- function {:inline} within_procedure(pc : bv64, id: bv64) : bool //is pc within the bounds of procedure id?
- {
-   GE_64(pc, startingAddress(id)) && LT_64(pc, endingAddress(id)) && legal(pc)
- }
 
  // We only need to implement one procedure, which models an arbitrary x64 procedure.
  const fid_P : bv64; //function id
@@ -175,7 +170,6 @@ modifies mem, pc, rsp, pushdown_stack_contents, pushdown_stack_top;
     invariant !writable(mem, oldrsp);
     invariant (forall i: bv64 :: (AddrInStack(i) && GE_64(i, PLUS_64(oldrsp, 40bv64))) ==>
                                  (!writable(oldMem, i) ==> (LOAD_LE_64(oldMem, i[64:3] ++ 0bv3) == LOAD_LE_64(mem, i[64:3] ++ 0bv3))));
-    invariant within_procedure(pc, fid_P);
   {
     havoc a_64; havoc d_8; havoc d_16; havoc d_32; havoc d_64;
 
@@ -183,12 +177,10 @@ modifies mem, pc, rsp, pushdown_stack_contents, pushdown_stack_top;
       call proof_store_8(a_64, d_8, oldrsp);
 
       pc := PLUS_64(pc, instructionLength(pc));
-      assume within_procedure(pc, fid_P);
     } else if (*) {
       call proof_setrsp(a_64, oldrsp);
 
       pc := PLUS_64(pc, instructionLength(pc));
-      assume within_procedure(pc, fid_P);
     } else if (*) {
       call proof_jmp(a_64, startingAddress(fid_P), endingAddress(fid_P), oldrsp);
 
@@ -209,7 +201,6 @@ modifies mem, pc, rsp, pushdown_stack_contents, pushdown_stack_top;
       assume procedure_postcondition(nestedOldMem, mem, nestedOldrsp, rsp, nestedOldPc, pc);
 
       pc := PLUS_64(pc, instructionLength(pc));
-      assume within_procedure(pc, fid_P);
     }
   }
 
@@ -304,7 +295,7 @@ modifies pc;
 }
 
 
-//x64 model of store
+//x64 model of load_8
 procedure {:inline 1} x64_load_8(addr: bv64)
 modifies mem;
 {
@@ -316,14 +307,14 @@ procedure {:inline 1} proof_load_8(addr: bv64, oldrsp: bv64)
 modifies mem;
 {
   //page permissions guarantee this
-  assume !AddrInGuardPage(addr);
+  assume !AddrInL(addr) && !AddrInGuardPage(addr);
 
   call x64_load_8(addr);
 
   assert !AddrInL(addr);  //asserted by the PDA (see defn 3)
 }
 
-//x64 model of store
+//x64 model of load_16
 procedure {:inline 1} x64_load_16(addr: bv64)
 modifies mem;
 {
@@ -335,12 +326,64 @@ procedure {:inline 1} proof_load_16(addr: bv64, oldrsp: bv64)
 modifies mem;
 {
   //page permissions guarantee this
-  assume !AddrInGuardPage(addr);
-  assume !AddrInGuardPage(PLUS_64(addr, 8bv64));
+  assume !AddrInL(addr) && !AddrInGuardPage(addr);
+  assume !AddrInL(PLUS_64(addr, 8bv64)) && !AddrInGuardPage(PLUS_64(addr, 8bv64));
 
-  call x64_load_8(addr);
+  call x64_load_16(addr);
 
-  assert !AddrInL(addr);  //asserted by the PDA (see defn 3)
+  //asserted by the PDA (see defn 3)
+  assert !AddrInL(addr) &&
+         !AddrInL(PLUS_64(addr, 8bv64));
+}
+
+//x64 model of load_32
+procedure {:inline 1} x64_load_32(addr: bv64)
+modifies mem;
+{
+  var value: bv32;
+  value := LOAD_LE_32(mem, addr);
+}
+//assume that the instrumented proof obligations (I) hold, and assert the validity checks on the PDA transition
+procedure {:inline 1} proof_load_32(addr: bv64, oldrsp: bv64)
+modifies mem;
+{
+  //page permissions guarantee this
+  assume !AddrInL(addr) && !AddrInGuardPage(addr);
+  assume !AddrInL(PLUS_64(addr, 8bv64)) && !AddrInGuardPage(PLUS_64(addr, 8bv64));
+  assume !AddrInL(PLUS_64(addr, 16bv64)) && !AddrInGuardPage(PLUS_64(addr, 16bv64));
+  assume !AddrInL(PLUS_64(addr, 24bv64)) && !AddrInGuardPage(PLUS_64(addr, 24bv64));
+
+  call x64_load_32(addr);
+
+  //asserted by the PDA (see defn 3)
+  assert !AddrInL(addr) && !AddrInL(PLUS_64(addr, 3bv64));
+}
+
+//x64 model of load_64
+procedure {:inline 1} x64_load_64(addr: bv64)
+modifies mem;
+{
+  var value: bv64;
+  value := LOAD_LE_64(mem, addr);
+}
+//assume that the instrumented proof obligations (I) hold, and assert the validity checks on the PDA transition
+procedure {:inline 1} proof_load_64(addr: bv64, oldrsp: bv64)
+modifies mem;
+{
+  //page permissions guarantee this
+  assume !AddrInL(addr) && !AddrInGuardPage(addr);
+  assume !AddrInL(PLUS_64(addr, 1bv64)) && !AddrInGuardPage(PLUS_64(addr, 1bv64));
+  assume !AddrInL(PLUS_64(addr, 2bv64)) && !AddrInGuardPage(PLUS_64(addr, 2bv64));
+  assume !AddrInL(PLUS_64(addr, 3bv64)) && !AddrInGuardPage(PLUS_64(addr, 3bv64));
+  assume !AddrInL(PLUS_64(addr, 4bv64)) && !AddrInGuardPage(PLUS_64(addr, 4bv64));
+  assume !AddrInL(PLUS_64(addr, 5bv64)) && !AddrInGuardPage(PLUS_64(addr, 5bv64));
+  assume !AddrInL(PLUS_64(addr, 6bv64)) && !AddrInGuardPage(PLUS_64(addr, 6bv64));
+  assume !AddrInL(PLUS_64(addr, 7bv64)) && !AddrInGuardPage(PLUS_64(addr, 7bv64));
+
+  call x64_load_64(addr);
+
+  //asserted by the PDA (see defn 3)
+  assert !AddrInL(addr) && !AddrInL(PLUS_64(addr, 56bv64));
 }
 
 //x64 model of store
@@ -354,11 +397,10 @@ procedure {:inline 1} proof_store_8(addr: bv64, value: bv8, oldrsp: bv64)
 modifies mem;
 {
   //following assumes are guaranteed by the proof obligations (see Table 1)
-  assume (AddrInStack(addr) &&
-          GE_64(addr, oldrsp) &&
-          !(GE_64(addr, PLUS_64(oldrsp, 8bv64)) &&
-          LT_64(addr, PLUS_64(oldrsp, 40bv64)))) ==> writable(mem,addr);
-  assume (AddrInBitmap(addr)) ==> (LT_64(largestAddrAffected_8(mem, addr, value), MINUS_64(oldrsp, 8bv64)));
+  assume store_cond_stack(addr, oldrsp)
+         ==>
+         writable(mem,addr);
+  assume store_cond_bitmap(mem, addr, value, oldrsp);
   assume AddrInU(addr);
   //page permissions guarantee that storing to guard page causes page fault exception
   assume !AddrInGuardPage(addr);
@@ -376,9 +418,23 @@ modifies mem;
 procedure {:inline 1} proof_store_16(addr: bv64, value: bv16, oldrsp: bv64)
 modifies mem;
 {
-  call proof_store_8(PLUS_64(addr, 1bv64), value[16:8], oldrsp);
-  call proof_store_8(addr, value[8:0], oldrsp);
+  //following assumes are guaranteed by the proof obligations (see Table 1)
+  assume (store_cond_stack(addr, oldrsp) ||
+          store_cond_stack(PLUS_64(addr,1bv64), oldrsp))
+          ==>
+          writable(mem,addr);
+  assume (store_cond_bitmap(mem, addr, value[8:0], oldrsp) &&
+          store_cond_bitmap(mem, PLUS_64(addr,1bv64), value[16:8], oldrsp));
+  assume AddrInU(addr) && AddrInU(PLUS_64(addr,1bv64));
+  //page permissions guarantee that storing to guard page causes page fault exception
+  assume !AddrInGuardPage(addr) && !AddrInGuardPage(PLUS_64(addr,1bv64));
+
+  call x64_store_16(addr, value);
+
+  //asserted by the PDA (see defn 3)
+  assert AddrInU(addr) && AddrInU(PLUS_64(addr,1bv64));
 }
+
 
 procedure {:inline 1} x64_store_32(addr: bv64, value: bv32)
 modifies mem;
@@ -388,8 +444,25 @@ modifies mem;
 procedure {:inline 1} proof_store_32(addr: bv64, value: bv32, oldrsp: bv64)
 modifies mem;
 {
-  call proof_store_16(PLUS_64(addr, 2bv64), value[32:16], oldrsp);
-  call proof_store_16(addr, value[16:0], oldrsp);
+  //following assumes are guaranteed by the proof obligations (see Table 1)
+  assume (store_cond_stack(addr, oldrsp) ||
+          store_cond_stack(PLUS_64(addr,1bv64), oldrsp) ||
+          store_cond_stack(PLUS_64(addr,2bv64), oldrsp) ||
+          store_cond_stack(PLUS_64(addr,3bv64), oldrsp))
+          ==>
+          writable(mem,addr);
+  assume (store_cond_bitmap(mem, addr, value[8:0], oldrsp) &&
+          store_cond_bitmap(mem, PLUS_64(addr,1bv64), value[16:8], oldrsp) &&
+          store_cond_bitmap(mem, PLUS_64(addr,2bv64), value[24:16], oldrsp) &&
+          store_cond_bitmap(mem, PLUS_64(addr,3bv64), value[32:24], oldrsp));
+  assume AddrInU(addr) && AddrInU(PLUS_64(addr,3bv64));
+  //page permissions guarantee that storing to guard page causes page fault exception
+  assume !AddrInGuardPage(addr) && !AddrInGuardPage(PLUS_64(addr,3bv64));
+
+  call x64_store_32(addr, value);
+
+  //asserted by the PDA (see defn 3)
+  assert AddrInU(addr) && AddrInU(PLUS_64(addr,3bv64));
 }
 
 procedure {:inline 1} x64_store_64(addr: bv64, value: bv64)
@@ -400,8 +473,33 @@ modifies mem;
 procedure {:inline 1} proof_store_64(addr: bv64, value: bv64, oldrsp: bv64)
 modifies mem;
 {
-  call proof_store_32(PLUS_64(addr, 4bv64), value[64:32], oldrsp);
-  call proof_store_32(addr, value[32:0], oldrsp);
+  //following assumes are guaranteed by the proof obligations (see Table 1)
+  assume (store_cond_stack(addr, oldrsp) ||
+          store_cond_stack(PLUS_64(addr,1bv64), oldrsp) ||
+          store_cond_stack(PLUS_64(addr,2bv64), oldrsp) ||
+          store_cond_stack(PLUS_64(addr,3bv64), oldrsp) ||
+          store_cond_stack(PLUS_64(addr,4bv64), oldrsp) ||
+          store_cond_stack(PLUS_64(addr,5bv64), oldrsp) ||
+          store_cond_stack(PLUS_64(addr,6bv64), oldrsp) ||
+          store_cond_stack(PLUS_64(addr,7bv64), oldrsp))
+          ==>
+          writable(mem,addr);
+  assume (store_cond_bitmap(mem, addr, value[8:0], oldrsp) &&
+          store_cond_bitmap(mem, PLUS_64(addr,1bv64), value[16:8], oldrsp) &&
+          store_cond_bitmap(mem, PLUS_64(addr,2bv64), value[24:16], oldrsp) &&
+          store_cond_bitmap(mem, PLUS_64(addr,3bv64), value[32:24], oldrsp) &&
+          store_cond_bitmap(mem, PLUS_64(addr,4bv64), value[40:32], oldrsp) &&
+          store_cond_bitmap(mem, PLUS_64(addr,5bv64), value[48:40], oldrsp) &&
+          store_cond_bitmap(mem, PLUS_64(addr,6bv64), value[56:48], oldrsp) &&
+          store_cond_bitmap(mem, PLUS_64(addr,7bv64), value[64:56], oldrsp));
+  assume AddrInU(addr) && AddrInU(PLUS_64(addr,7bv64));
+  //page permissions guarantee that storing to guard page causes page fault exception
+  assume !AddrInGuardPage(addr) && !AddrInGuardPage(PLUS_64(addr,7bv64));
+
+  call x64_store_64(addr, value);
+
+  //asserted by the PDA (see defn 3)
+  assert AddrInU(addr) && AddrInU(PLUS_64(addr,7bv64));
 }
 
 
@@ -418,19 +516,10 @@ modifies rsp;
   assume (newrsp[3:0] == 0bv3 && LE_64(newrsp, oldrsp));
 
   call x64_setrsp(newrsp);
+
+  assert AddrInU(rsp);
 }
 
-
-
-
-
-
-function {:inline} procedure_postcondition(mem: [bv64] bv8, mem': [bv64] bv8, rsp: bv64, rsp': bv64, pc: bv64, pc': bv64) : bool
-{
-  (rsp' == rsp) &&
-  (forall i: bv64 :: (AddrInStack(i) && GE_64(i, rsp')) ==> (writable(mem, i) <==> writable(mem', i))) &&
-  (forall i: bv64 :: (AddrInStack(i) && GE_64(i, PLUS_64(rsp',40bv64)) && !writable(mem, i) ==> (LOAD_LE_64(mem, i[64:3] ++ 0bv3) == LOAD_LE_64(mem', i[64:3] ++ 0bv3))))
-}
 
 // used to push a return address on the pushdown stack
 procedure {:inline 1} push(x: bv64)
@@ -446,4 +535,24 @@ modifies pushdown_stack_top;
 {
   pushdown_stack_top := pushdown_stack_top - 1;
   result := pushdown_stack_contents[pushdown_stack_top];
+}
+
+//used like a macro
+function {:inline} store_cond_stack(addr: bv64, oldrsp: bv64) : bool
+{
+  AddrInStack(addr) && GE_64(addr, oldrsp) && !(GE_64(addr, PLUS_64(oldrsp, 8bv64)) && LT_64(addr, PLUS_64(oldrsp, 40bv64)))
+}
+
+//used like a macro
+function {:inline} store_cond_bitmap(mem: [bv64] bv8, addr: bv64, value: bv8, oldrsp: bv64) : bool
+{
+  AddrInBitmap(addr) ==> LT_64(largestAddrAffected_8(mem, addr, value), MINUS_64(oldrsp, 8bv64))
+}
+
+//used like a macro
+function {:inline} procedure_postcondition(mem: [bv64] bv8, mem': [bv64] bv8, rsp: bv64, rsp': bv64, pc: bv64, pc': bv64) : bool
+{
+  (rsp' == rsp) &&
+  (forall i: bv64 :: (AddrInStack(i) && GE_64(i, rsp')) ==> (writable(mem, i) <==> writable(mem', i))) &&
+  (forall i: bv64 :: (AddrInStack(i) && GE_64(i, PLUS_64(rsp',40bv64)) && !writable(mem, i) ==> (LOAD_LE_64(mem, i[64:3] ++ 0bv3) == LOAD_LE_64(mem', i[64:3] ++ 0bv3))))
 }
