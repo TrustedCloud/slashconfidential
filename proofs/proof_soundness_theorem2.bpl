@@ -2,6 +2,7 @@
   Invoke Boogie as follows:
     boogie prelude.bpl proof_soundness_theorem2.bpl
       /z3opt:smt.RELEVANCY=0
+      /z3opt:smt.CASE_SPLIT=0
       /proverOpt:OPTIMIZE_FOR_BV=true
       /errorLimit:1
   Takes 21 seconds to verify on a macbook machine.
