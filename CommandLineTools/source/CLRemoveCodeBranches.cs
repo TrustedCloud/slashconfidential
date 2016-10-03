@@ -13,18 +13,9 @@ namespace CommandLineTools
 {
     class CLRemoveCodeBranches
     {
-        public static void Run(string inputFile, string outputFile)
+        public static void Run(Program input)
         {
-            Program prog = null;
-            Utils.ParseProgram(inputFile, out prog);
-            Utils.Assert(prog.Implementations.Count() == 1, "Expecting a single implementation in the program");
-
-            CfiVerifier.RemoveCodeBranches.Run(prog.Implementations.First());
-
-            using (TokenTextWriter ttw = new TokenTextWriter(outputFile))
-            {
-                prog.Emit(ttw);
-            }
+            CfiVerifier.RemoveCodeBranches.Run(input.Implementations.First());
         }
     }
 

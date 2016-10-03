@@ -12,16 +12,9 @@ namespace CommandLineTools
 {
     class CLParitionSlicer
     {
-        public static void Run(string inputFile, string outputFile)
+        public static void Run(Program input)
         {
-            Program prog = null;
-            Utils.ParseProgram(inputFile, out prog);
-            Utils.Assert(prog.Implementations.Count() == 1, "Expecting program with a single implementation.");
-            (new PartitionAssumeSlicer()).Visit(prog.Implementations.First());
-            using (TokenTextWriter ttw = new TokenTextWriter(outputFile))
-            {
-                prog.Emit(ttw);
-            }
+            (new PartitionAssumeSlicer()).Visit(input.Implementations.First());
         }
     }
 }

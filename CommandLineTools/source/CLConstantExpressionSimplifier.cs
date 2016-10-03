@@ -10,17 +10,9 @@ namespace CommandLineTools
 {
     class CLConstantExpressionSimplifier
     {
-        public static void Run(string inputFile, string outputFile)
+        public static void Run(Program input)
         {
-            Program prog = null;
-            Utils.ParseProgram(inputFile, out prog);
-            Utils.Assert(prog.Implementations.Count() == 1, "Expecting program with a single implementation.");
-            (new CfiVerifier.ConstantExpressionSimplifier()).Visit(prog);
-            using (TokenTextWriter ttw = new TokenTextWriter(outputFile))
-            {
-                prog.Emit(ttw);
-            }
-
+            (new CfiVerifier.ConstantExpressionSimplifier()).Visit(input);
         }
     }
 }

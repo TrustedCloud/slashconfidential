@@ -19,12 +19,9 @@ namespace CommandLineTools
             CALL
         }
 
-        public static void Run(string inputFile, string outputFile)
+        public static void Run(Program input, string outputFile)
         {
-            Program prog = null;
-            Utils.ParseProgram(inputFile, out prog);
-            Utils.Assert(prog.Implementations.Count() == 1, "Expecting a single implementation in the program");
-            Implementation impl = prog.Implementations.First();
+            Implementation impl = input.Implementations.First();
             CommandLineOptions.Clo.PruneInfeasibleEdges = true;
             impl.PruneUnreachableBlocks();
             ICFG cfg = new ICFG(impl);
@@ -111,7 +108,7 @@ namespace CommandLineTools
             HashSet<MemoryOperation> memoryLocations = new HashSet<MemoryOperation>();
             foreach (Cmd c in b.Cmds)
             {
-                if (c is AssignCmd) 
+                if (c is AssignCmd)
                 {
                     AssignCmd assignCmd = c as AssignCmd;
                     string lhsName = assignCmd.Lhss.First().DeepAssignedVariable.Name;

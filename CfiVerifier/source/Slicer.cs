@@ -14,7 +14,7 @@ using VC;
 using Microsoft.Basetypes;
 using BType = Microsoft.Boogie.Type;
 
-namespace CfiVerifier 
+namespace CfiVerifier
 {
     public class Slicer : StandardVisitor
     {
@@ -23,10 +23,10 @@ namespace CfiVerifier
         private AssertCmd source_assert;
         private Expr return_instrumentation_address = null;
         private List<Function> call_trigger_functions = new List<Function>();
-    
+
         private HashSet<Cmd> keep_set;
         private Dictionary<Cmd, HashSet<Variable>> live_set;
-    
+
         public Slicer(Program prog)
         {
             Utils.Assert(prog.Implementations.Count() == 1, "Expecting a single implementation");
@@ -57,7 +57,7 @@ namespace CfiVerifier
                      * this function ensures that triggers for call instrumentation are not sliced away */
                     IdentifyReturnInstrumentationAddress(c);
 
-                    
+
                 }
             }
             Utils.Assert(this.source_assert != null, "Unable to find source assertion");
@@ -76,7 +76,7 @@ namespace CfiVerifier
             SliceRequires();
 
         }
-        
+
         private void PerformTaintAnalysisAlternate()
         {
             bool fixed_point = false;
@@ -98,7 +98,7 @@ namespace CfiVerifier
                 }
             }
         }
-    
+
         private HashSet<Cmd> FindPredCmds(Block b, ICFG cfg)
         {
             HashSet<Cmd> pred_cmds = new HashSet<Cmd>();
@@ -121,7 +121,7 @@ namespace CfiVerifier
             }
             return pred_cmds;
         }
-    
+
         private bool PerformCommandAnalysis(List<Cmd> cmds)
         {
             int size_before;
@@ -133,7 +133,7 @@ namespace CfiVerifier
                 prev_cmd = cmds.ElementAt(i - 1);
                 size_before = this.live_set[prev_cmd].Count;
                 keep_before = this.keep_set.Contains(prev_cmd);
-        
+
                 AssignCmd as_assign_cmd = prev_cmd is AssignCmd ? prev_cmd as AssignCmd : null;
                 HashSet<Variable> to_union = new HashSet<Variable>(this.live_set[this_cmd]);
                 Variable assign_cmd_lhs_var = null;
@@ -143,22 +143,22 @@ namespace CfiVerifier
                     to_union.Remove(assign_cmd_lhs_var);
                 }
                 this.live_set[prev_cmd].UnionWith(to_union);
-                if (as_assign_cmd != null) 
+                if (as_assign_cmd != null)
                 {
                     Utils.Assert(as_assign_cmd.Lhss.Count == 1);
                     Utils.Assert(assign_cmd_lhs_var != null);
                     HashSet<Variable> assign_cmd_rhs_vars = new HashSet<Variable>();
-                    foreach (Expr rhs_expr in as_assign_cmd.Rhss) 
+                    foreach (Expr rhs_expr in as_assign_cmd.Rhss)
                     {
                         assign_cmd_rhs_vars.UnionWith(GetReferencedVars(rhs_expr));
                     }
-                    if (this.live_set[this_cmd].Contains(assign_cmd_lhs_var)) 
+                    if (this.live_set[this_cmd].Contains(assign_cmd_lhs_var))
                     {
                         this.live_set[prev_cmd].UnionWith(assign_cmd_rhs_vars);
                         this.keep_set.Add(prev_cmd);
                     }
                 }
-                if (prev_cmd is AssumeCmd /*&& !QKeyValue.FindBoolAttribute((prev_cmd as AssumeCmd).Attributes, "partition")*/) 
+                if (prev_cmd is AssumeCmd /*&& !QKeyValue.FindBoolAttribute((prev_cmd as AssumeCmd).Attributes, "partition")*/)
                 {
                     this.live_set[prev_cmd].UnionWith(GetReferencedVars(prev_cmd));
                     this.keep_set.Add(prev_cmd);
@@ -175,7 +175,7 @@ namespace CfiVerifier
             }
             return changed;
         }
-    
+
         private HashSet<Variable> GetReferencedVars(Cmd c)
         {
             if (c is AssignCmd)
@@ -205,11 +205,11 @@ namespace CfiVerifier
             Utils.Assert(false, "Unhandled Cmd type: " + c.GetType().ToString());
             return null;
         }
-    
+
         private HashSet<Variable> GetReferencedVars(Expr e)
         {
             HashSet<Variable> referenced_vars = new HashSet<Variable>();
-            if (e is NAryExpr) 
+            if (e is NAryExpr)
             {
                 foreach (Expr sub_e in (e as NAryExpr).Args)
                     referenced_vars.UnionWith(GetReferencedVars(sub_e));
@@ -280,7 +280,7 @@ namespace CfiVerifier
             foreach (Requires r in dll_func_proc.Requires.ToList())
             {
                 Expr reqAddress = GetRequiresAddress(r);
-                if (this.return_instrumentation_address != null && reqAddress != null 
+                if (this.return_instrumentation_address != null && reqAddress != null
                     && reqAddress.ComputeHashCode() != this.return_instrumentation_address.ComputeHashCode())
                 {
                     dll_func_proc.Requires.Remove(r);
@@ -290,7 +290,7 @@ namespace CfiVerifier
 
         private NAryExpr GetRequiresAddress(Requires r)
         {
-            if (!(r.Condition is NAryExpr)) 
+            if (!(r.Condition is NAryExpr))
             {
                 return null;
             }
@@ -298,12 +298,12 @@ namespace CfiVerifier
             string conditionFuncName = conditionNary.Fun.FunctionName;
             if (conditionFuncName.Equals("!"))
             {
-                if (conditionNary.Args.Count != 1 || !(conditionNary.Args.First() is NAryExpr)) 
+                if (conditionNary.Args.Count != 1 || !(conditionNary.Args.First() is NAryExpr))
                 {
                     return null;
                 }
                 NAryExpr innerConditionNary = conditionNary.Args.First() as NAryExpr;
-                if (innerConditionNary.Fun.FunctionName != "writable" 
+                if (innerConditionNary.Fun.FunctionName != "writable"
                     || !((innerConditionNary.Args.Last() as NAryExpr).Fun.FunctionName.Equals("MINUS_64")))
                 {
                     return null;
@@ -323,7 +323,7 @@ namespace CfiVerifier
 
         private void IdentifyReturnInstrumentationAddress(Cmd c)
         {
-            if (c is AssertCmd) 
+            if (c is AssertCmd)
             {
                 Expr return_instrumentation_addr = QKeyValue.FindExprAttribute((c as AssertCmd).Attributes, "return_instrumentation");
                 if (return_instrumentation_addr != null)

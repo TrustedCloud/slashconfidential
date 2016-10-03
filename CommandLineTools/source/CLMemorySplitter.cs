@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -12,29 +13,28 @@ namespace CommandLineTools
 {
     class CLMemorySplitter
     {
-        public static void Run(string inputFile, string outputFile, bool processed)
+        public static void Run(Program input, bool processed)
         {
-            Program prog = null;
-            Implementation impl = null;
+            StringWriter sw = new StringWriter();
+            TokenTextWriter ttw = new TokenTextWriter(sw);
+            input.Emit(ttw);
+            ttw.Close();
 
             Options.splitMemoryModel = false;
             Options.splitFiles = true; // HACK
-            Utils.ExtractProgAndImpl(inputFile, out prog, out impl);
+            Program prog;
+            Utils.ParseString(sw.ToString(), out prog);
             if (!processed)
                 CodeProcess(prog);
             Dictionary<Tuple<string, Cmd, AssertCmd>, bool> storeAddressRegionDB = DecideAddressRegions(prog, true);
-            Utils.ExtractProgAndImpl(inputFile, out prog, out impl);
+            Utils.ParseString(sw.ToString(), out prog);
             if (!processed)
                 CodeProcess(prog);
             Dictionary<Tuple<string, Cmd, AssertCmd>, bool> loadAddressRegionDB = DecideAddressRegions(prog, false);
-            Utils.ExtractProgAndImpl(inputFile, out prog, out impl);
+            Utils.ParseString(sw.ToString(), out prog);
             Options.splitMemoryModel = true;
-            (new SplitMemoryModeler(storeAddressRegionDB, loadAddressRegionDB)).Visit(prog);
-
-            using (TokenTextWriter ttw = new TokenTextWriter(outputFile))
-            {
-                prog.Emit(ttw);
-            }
+            (new SplitMemoryModeler(storeAddressRegionDB, loadAddressRegionDB)).Visit(input);
+            sw.Close();
         }
 
         private static void CodeProcess(Program prog) {

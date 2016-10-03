@@ -13,18 +13,11 @@ namespace CommandLineTools
 {
     class CLSlicer
     {
-        public static void Run(string inputFile, string outputFile)
+        public static void Run(Program input)
         {
-            Program prog = null;
-            Utils.ParseProgram(inputFile, out prog);
-            (new CfiVerifier.Slicer(prog)).Visit(prog);
+            (new CfiVerifier.Slicer(input)).Visit(input);
             CommandLineOptions.Clo.PruneInfeasibleEdges = true;
-            Utils.Assert(prog.Implementations.Count() == 1, "Expecting a single implementation in the program");
-            prog.Implementations.First().PruneUnreachableBlocks();
-            using (TokenTextWriter ttw = new TokenTextWriter(outputFile))
-            {
-                prog.Emit(ttw);
-            }
+            input.Implementations.First().PruneUnreachableBlocks();
         }
     }
 }
