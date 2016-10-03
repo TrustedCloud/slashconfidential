@@ -67,7 +67,7 @@ namespace CfiVerifier
             return base.VisitCmdSeq(newCmdSeq);
         }
 
-        //precondition: each block contains at most one assert with SlashVerifyCommandType attribute, 
+        //precondition: each block contains at most one assert with SlashVerifyCommandType attribute,
         //              which is true since we use a block for each instruction
         private bool EquivalentCmd(Cmd c1, Cmd c2)
         {
@@ -109,7 +109,7 @@ namespace CfiVerifier
             this.target_label = label;
             this.target_typedCmd = typedCmd;
             this.target_assertion = assertion;
-            if (this.target_assertion.Attributes != null) 
+            if (this.target_assertion.Attributes != null)
             {
                 this.target_assertion.Attributes.AddLast(new QKeyValue(Token.NoToken, "source_assert", new List<object> (), null));
             }
@@ -161,6 +161,11 @@ namespace CfiVerifier
             }
         }
 
+        private static void AddSolver(List<Tuple<string, string>> solvers, string solverName, string solverPath, string solverFlags) {
+          if (File.Exists(solverPath))
+            solvers.Add(new Tuple<string, string>(solverName, @"/z3exe:" + solverPath + " " + solverFlags));
+        }
+
         System.Collections.Concurrent.ConcurrentDictionary<int, bool> shared_result_struct;
         public Dictionary<Tuple<string, Cmd, AssertCmd>, bool> VerifyInstrumentedProcedures(Program prog)
         {
@@ -200,18 +205,14 @@ namespace CfiVerifier
 
             //Parallel.For(0, numAssertions, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, i => CheckAssertion(i));
             var delim = Options.IsLinux() ? @"/" : @"\";
-            List<Tuple<string, string>> solvers = new List<Tuple<string, string>> 
-            {
-                  new Tuple<string, string>("Z3_441",
-                    @"/z3exe:." + delim + "references" + delim + "z3.4.4.1.exe /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0"),
-                  /*new Tuple<string, string>("Z3_440",
-                    "/z3exe:." + delim + "references" + delim + "z3.4.4.0.exe /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0"),*/
-            };
+            List<Tuple<string, string>> solvers = new List<Tuple<string, string>>();
+            AddSolver(solvers, "Z3_441", @"." + delim + "references" + delim + "z3.4.4.1.exe", "/z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0");
+            AddSolver(solvers, "Z3_441", @"../../../references/z3.4.4.1.exe", "/z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0");
 
-            // work stealing parallel implementation 
+            // work stealing parallel implementation
             workItems = new System.Collections.Concurrent.ConcurrentBag<Tuple<string, string, int>>();
-            foreach (Tuple<string, string> solver in solvers) 
-                for (int i = 0; i < numAssertions; i++) 
+            foreach (Tuple<string, string> solver in solvers)
+                for (int i = 0; i < numAssertions; i++)
                     workItems.Add(new Tuple<string, string, int>(solver.Item1, solver.Item2, i));
 
 
@@ -224,10 +225,10 @@ namespace CfiVerifier
             threads.Iter(t => t.Start());
             threads.Iter(t => t.Join());
 
-            
+
             foreach (Tuple<string, Cmd, AssertCmd, SlashVerifyCmdType> assertion in assertions)
             {
-                result[new Tuple<string, Cmd, AssertCmd>(assertion.Item1, assertion.Item2, assertion.Item3)] = 
+                result[new Tuple<string, Cmd, AssertCmd>(assertion.Item1, assertion.Item2, assertion.Item3)] =
                     shared_result_struct[intermediate[assertion]];
             }
             return result;

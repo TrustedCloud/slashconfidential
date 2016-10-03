@@ -16,7 +16,7 @@ namespace CfiDriver
         enum BoogieResult { VERIFIED, ERROR, UNKNOWN };
 
         static bool verbose = true;
-        static string resultFileName = @"ResultSummary_" + DateTime.Now.Hour.ToString() + "_" 
+        static string resultFileName = @"ResultSummary_" + DateTime.Now.Hour.ToString() + "_"
             + DateTime.Now.Minute.ToString() + "_" + DateTime.Now.Second.ToString() + ".txt";
         static TextWriter resultFileNameWriter = new StreamWriter(resultFileName, true);
 
@@ -103,8 +103,8 @@ namespace CfiDriver
                   Console.WriteLine("Benchmark " + benchmark.Item1 + " did not generate any assertions");
                   continue;
               }
-              Console.WriteLine("\tFOUND {0} assertions in benchmark {1}, Running them in parallel...", 
-                  attributes.numSplits, 
+              Console.WriteLine("\tFOUND {0} assertions in benchmark {1}, Running them in parallel...",
+                  attributes.numSplits,
                   benchmark.Item1);
               if (!doNotRunBenchmarks) {
                   CheckAssertionsInParallel(benchmark.Item1, benchmark.Item4, attributes);
@@ -119,8 +119,8 @@ namespace CfiDriver
               //TextWriter fileWriter = new StreamWriter("script");
               //for (int i = 0; i < attributes.numSplits; i++)
               //{
-              //    string boogie_args = @" " + benchmark.Item1 + delim + @"split_" + i.ToString() + @"." + 
-              //        benchmark.Item4 + ".bpl /timeLimit:" + Options.timeoutPerProcess + 
+              //    string boogie_args = @" " + benchmark.Item1 + delim + @"split_" + i.ToString() + @"." +
+              //        benchmark.Item4 + ".bpl /timeLimit:" + Options.timeoutPerProcess +
               //        @" /contractInfer /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0 /errorLimit:1";
               //    string boogie_bin = @"." + delim + "references" + delim + "Boogie.exe";
               //    fileWriter.WriteLine(boogie_bin + boogie_args);
@@ -147,24 +147,25 @@ namespace CfiDriver
             return new Tuple<int, int, int>(numVerified, numError, numUnknown);
         }
 
+        private static void AddSolver(List<Tuple<string, string>> solvers, string solverName, string solverExecFlag, string solverPath, string solverFlags) {
+          if (File.Exists(solverPath))
+            solvers.Add(new Tuple<string, string>(solverName, solverExecFlag + solverPath + " " + solverFlags));
+        }
+
         private static System.Collections.Concurrent.ConcurrentBag<Tuple<string, string, int, ProgramAttributes>> workItems;
 
         private static void CheckAssertionsInParallel(string directory, string tag, ProgramAttributes attributes)
         {
-            //Parallel.For(0, attributes.numSplits, 
+            //Parallel.For(0, attributes.numSplits,
             //  new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
             //  i => CheckAssertion(directory, tag, i, attributes));
             var delim = Options.IsLinux() ? @"/" : @"\";
-            List<Tuple<string, string>> solvers = new List<Tuple<string, string>> 
-            {
-                  new Tuple<string, string>("Z3_441",
-                    @"/z3exe:." + delim + "references" + delim + "z3.4.4.1.exe /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0"),
-                  new Tuple<string, string>("Z3_441_OPTIMIZE_BV",
-                    @"/z3exe:." + delim + "references" + delim + "z3.4.4.1.exe /proverOpt:OPTIMIZE_FOR_BV=true"),
-                  new Tuple<string, string>("Z3_440",
-                    @"/z3exe:." + delim + "references" + delim + "z3.4.4.0.exe /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0"),
-            };
-            // work stealing parallel implementation 
+            List<Tuple<string, string>> solvers = new List<Tuple<string, string>>();
+            AddSolver(solvers, "Z3_440", @"/z3exe:", "." + delim + "references" + delim + "z3.4.4.0.exe", "/z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0");
+            AddSolver(solvers, "Z3_441", @"/z3exe:", "." + delim + "references" + delim + "z3.4.4.1.exe", "/z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0");
+            AddSolver(solvers, "Z3_441_OPTIMIZE_BV", @"/z3exe:", "." + delim + "references" + delim + "z3.4.4.1.exe", "/proverOpt:OPTIMIZE_FOR_BV=true");
+
+            // work stealing parallel implementation
             workItems = new System.Collections.Concurrent.ConcurrentBag<Tuple<string, string, int, ProgramAttributes>>();
             foreach (Tuple<string, string> solver in solvers)
             {
@@ -231,7 +232,7 @@ namespace CfiDriver
           Func<string, BoogieResult> result = delegate(string s)
           {
             if (s.Contains("Boogie program verifier finished with 1 verified, 0 errors")) { return BoogieResult.VERIFIED; }
-            else if (s.Contains("Boogie program verifier finished with 0 verified, 1 error") && 
+            else if (s.Contains("Boogie program verifier finished with 0 verified, 1 error") &&
                      s.Contains("This assertion might not hold")) { return BoogieResult.ERROR; }
 
             return BoogieResult.UNKNOWN;
@@ -361,7 +362,7 @@ namespace CfiDriver
                 string output = "";
                 output = proc.StandardOutput.ReadToEnd();
                 proc.WaitForExit();
-                
+
                 # region deprecated logic for forcing a timeout
                 //
                 // Caution: Using proc.WaitForExit(1200000) causes processes to be idle
@@ -377,7 +378,7 @@ namespace CfiDriver
                 //    proc.Kill();
                 //    return new Tuple<string, string, string, string>("TIMEOUT", "UNKNOWN", "TIMEOUT", "TIMEOUT");
                 //}
-                #endregion 
+                #endregion
                 Console.WriteLine("\tEND Executing {0} {1}", binaryName, arguments);
 
                 ProgramAttributes attributes = new ProgramAttributes();
@@ -403,19 +404,19 @@ namespace CfiDriver
         }
 
         private static void RegisterResult(
-            string directory, 
-            string tag, 
-            int splitId, 
+            string directory,
+            string tag,
+            int splitId,
             ProgramAttributes attributes,
-            BoogieResult result, 
+            BoogieResult result,
             int timeInSeconds )
         {
           if (!results.ContainsKey(directory))
           {
             results[directory] = new SortedDictionary<int, Tuple<string, ProgramAttributes, BoogieResult, int>>();
           }
-          if (!results[directory].ContainsKey(splitId)) 
-          { 
+          if (!results[directory].ContainsKey(splitId))
+          {
             results[directory][splitId] = Tuple.Create(tag, attributes, result, timeInSeconds);
           }
           else
@@ -437,7 +438,7 @@ namespace CfiDriver
                   entry.Value.Item3 +
                   "[" + entry.Value.Item2.assertionTypes[entry.Key] + "]" +
                   "[blocks:" + entry.Value.Item2.numBasicBlocks.ToString() + "]" +
-                  (entry.Value.Item2.foundLoop ? "[LOOP]" : "[NOLOOP]") + 
+                  (entry.Value.Item2.foundLoop ? "[LOOP]" : "[NOLOOP]") +
                   ("[time:" + entry.Value.Item4 + "]") +
                   ("[solver:" + entry.Value.Item2.solverName + "]"));
             }
