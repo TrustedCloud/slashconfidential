@@ -33,7 +33,7 @@ namespace CommandLineTools
             Dictionary<Tuple<string, Cmd, AssertCmd>, bool> loadAddressRegionDB = DecideAddressRegions(prog, false);
             Utils.ParseString(sw.ToString(), out prog);
             Options.splitMemoryModel = true;
-            (new SplitMemoryModeler(storeAddressRegionDB, loadAddressRegionDB)).Visit(input);
+			(new SplitMemoryModeler(storeAddressRegionDB, loadAddressRegionDB, Utils.ProgramIsSplit(input))).Visit(input);
             sw.Close();
         }
 

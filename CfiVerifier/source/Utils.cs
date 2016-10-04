@@ -39,7 +39,7 @@ namespace CfiVerifier
         {
             if (!b) throw new Exception("assertion failure: " + msg);
         }
-        
+
         public static void PrintProg(Program p)
         {
             var filename = Options.outputPath + @"/" + Options.instrumentedFile;
@@ -52,7 +52,7 @@ namespace CfiVerifier
             if (!Utils.ParseProgram(fname, out prog)) {
                 Utils.Assert(false, "Unable to parse file " + fname);
             }
-            
+
             impl = prog.TopLevelDeclarations.Where(x => x is Implementation &&
                 ((Implementation)x).Name.Contains("dll_func")).ElementAt(0) as Implementation;
 
@@ -95,7 +95,7 @@ namespace CfiVerifier
             //s.Visit(prog);
             return true;
         }
-        
+
         public static bool ParseString(string fstring, out Program prog)
         {
             prog = null;
@@ -178,29 +178,29 @@ namespace CfiVerifier
                 AssignLhs lhs = ac.Lhss[0];
                 Expr rhs = ac.Rhss[0];
 
-                if (lhs.Type.IsMap && RhsMatch(rhs, "STORE_LE_8")) 
-                { 
-                    return SlashVerifyCmdType.Store8; 
+                if (lhs.Type.IsMap && RhsMatch(rhs, "STORE_LE_8"))
+                {
+                    return SlashVerifyCmdType.Store8;
                 }
-                else if (lhs.Type.IsMap && RhsMatch(rhs, "STORE_LE_16")) 
-                { 
-                    return SlashVerifyCmdType.Store16; 
+                else if (lhs.Type.IsMap && RhsMatch(rhs, "STORE_LE_16"))
+                {
+                    return SlashVerifyCmdType.Store16;
                 }
-                else if (lhs.Type.IsMap && RhsMatch(rhs, "STORE_LE_32")) 
-                { 
-                    return SlashVerifyCmdType.Store32; 
+                else if (lhs.Type.IsMap && RhsMatch(rhs, "STORE_LE_32"))
+                {
+                    return SlashVerifyCmdType.Store32;
                 }
-                else if (lhs.Type.IsMap && RhsMatch(rhs, "STORE_LE_64")) 
-                { 
-                    return SlashVerifyCmdType.Store64; 
+                else if (lhs.Type.IsMap && RhsMatch(rhs, "STORE_LE_64"))
+                {
+                    return SlashVerifyCmdType.Store64;
                 }
-                else if (lhs.Type.IsMap && RhsMatch(rhs, "REP_STOSB")) 
-                { 
-                    return SlashVerifyCmdType.RepStosB; 
+                else if (lhs.Type.IsMap && RhsMatch(rhs, "REP_STOSB"))
+                {
+                    return SlashVerifyCmdType.RepStosB;
                 }
-                else if (lhs.Type.IsBv && lhs.DeepAssignedIdentifier.Name.Equals("RSP")) 
-                { 
-                    return SlashVerifyCmdType.SetRSP; 
+                else if (lhs.Type.IsBv && lhs.DeepAssignedIdentifier.Name.Equals("RSP"))
+                {
+                    return SlashVerifyCmdType.SetRSP;
                 }
             }
             else if (c is AssertCmd)
@@ -211,45 +211,45 @@ namespace CfiVerifier
                 string attribute_cmdtype = QKeyValue.FindStringAttribute(ac.Attributes, "SlashVerifyCommandType");
                 string attribute_jmptarget = QKeyValue.FindStringAttribute(ac.Attributes, "SlashVerifyJmpTarget");
 
-                if (attribute_cmdtype != null && 
-                    attribute_cmdtype.Equals("ret")) 
-                { 
+                if (attribute_cmdtype != null &&
+                    attribute_cmdtype.Equals("ret"))
+                {
                     return SlashVerifyCmdType.Ret;
                 }
-                else if (attribute_cmdtype != null && 
-                    attribute_cmdtype.Equals("call")) 
-                { 
-                    return SlashVerifyCmdType.Call; 
+                else if (attribute_cmdtype != null &&
+                    attribute_cmdtype.Equals("call"))
+                {
+                    return SlashVerifyCmdType.Call;
                 }
-                else if (attribute_cmdtype != null && attribute_jmptarget != null && 
-                    attribute_cmdtype.Equals("remotejmp")) 
-                { 
-                    return SlashVerifyCmdType.RemoteJmp; 
+                else if (attribute_cmdtype != null && attribute_jmptarget != null &&
+                    attribute_cmdtype.Equals("remotejmp"))
+                {
+                    return SlashVerifyCmdType.RemoteJmp;
                 }
-                else if (attribute_cmdtype != null && attribute_jmptarget != null && 
-                    attribute_cmdtype.Equals("indirectjmp") && attribute_jmptarget.Equals("remote")) 
-                { 
-                    return SlashVerifyCmdType.RemoteIndirectJmp; 
+                else if (attribute_cmdtype != null && attribute_jmptarget != null &&
+                    attribute_cmdtype.Equals("indirectjmp") && attribute_jmptarget.Equals("remote"))
+                {
+                    return SlashVerifyCmdType.RemoteIndirectJmp;
                 }
             }
 
-            return SlashVerifyCmdType.None; 
+            return SlashVerifyCmdType.None;
         }
 
         //input must be a load expression
-        public static Tuple<Variable,Expr> getLoadArgs(Expr e)
+		public static Tuple<Expr,Expr> getLoadArgs(Expr e)
         {
             Func<Expr, string, bool> RhsMatch = delegate(Expr x, String s)
             {
                 return (x is NAryExpr && ((NAryExpr)x).Fun.FunctionName.Equals(s));
             };
 
-            Utils.Assert( RhsMatch(e, "LOAD_LE_8") || 
-                          RhsMatch(e, "LOAD_LE_16") || 
-                          RhsMatch(e, "LOAD_LE_32") || 
+            Utils.Assert( RhsMatch(e, "LOAD_LE_8") ||
+                          RhsMatch(e, "LOAD_LE_16") ||
+                          RhsMatch(e, "LOAD_LE_32") ||
                           RhsMatch(e, "LOAD_LE_64"),
                 "Expected load expression");
-            return Tuple.Create<Variable, Expr>((((NAryExpr) e).Args[0] as IdentifierExpr).Decl, ((NAryExpr) e).Args[1]);
+            return Tuple.Create<Expr, Expr>(((NAryExpr) e).Args[0], ((NAryExpr) e).Args[1]);
         }
 
         /* returns (mem, addr, data) */
@@ -268,8 +268,8 @@ namespace CfiVerifier
                 "Expected store expression");
 
             Utils.Assert(((NAryExpr)rhs).Args.Count == 3, "Store must have 3 arguments");
-            return Tuple.Create<Variable, Expr, Expr>((((NAryExpr)rhs).Args[0] as IdentifierExpr).Decl, 
-                ((NAryExpr)rhs).Args[1], 
+            return Tuple.Create<Variable, Expr, Expr>((((NAryExpr)rhs).Args[0] as IdentifierExpr).Decl,
+                ((NAryExpr)rhs).Args[1],
                 ((NAryExpr)rhs).Args[2]);
         }
 
@@ -360,8 +360,8 @@ namespace CfiVerifier
             else if (original is BvConcatExpr)
             {
                 BvConcatExpr tmp = (original as BvConcatExpr);
-                return new BvConcatExpr(Token.NoToken, 
-                    substituteForIdentifierExpr(tmp.E0, id, replacement), 
+                return new BvConcatExpr(Token.NoToken,
+                    substituteForIdentifierExpr(tmp.E0, id, replacement),
                     substituteForIdentifierExpr(tmp.E1, id, replacement));
             }
             else if (original is NAryExpr)
@@ -430,7 +430,7 @@ namespace CfiVerifier
             var graph = Program.GraphFromImpl(impl);
             //Utils.Assert(graph.Reducible, "Irreducible flow graphs are unsupported.");
             Utils.Assert(graph.Nodes.Count() > 1, "Doesn't work for graphs with 1 node");
-            //figure out the source node. that's where the program starts. 
+            //figure out the source node. that's where the program starts.
             IEnumerable<Block> sourceNodes = graph.Nodes.Where(n => graph.Predecessors(n).Count() == 0);
             //Also assert that there is only one source node (unless there is unreachable node in the CFG)
             Utils.Assert(sourceNodes.Count() == 1);
@@ -455,6 +455,11 @@ namespace CfiVerifier
             //Console.WriteLine("We should capture mem here: {0}", currentNode.Label);
             return new Tuple<string, List<string>>(currentNode.Label, loopHeaderLabels);
         }
-    }
 
+		public static bool ProgramIsSplit(Program prog) {
+			Utils.Assert (prog.Implementations.Count() == 1, "Expected program with a single implementation!");
+			return prog.GlobalVariables.FirstOrDefault(i => i.Name.Equals("mem_bitmap")) != null
+				&& prog.GlobalVariables.FirstOrDefault(i => i.Name.Equals("mem_stack")) != null;
+        }
+    }
 }

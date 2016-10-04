@@ -37,13 +37,13 @@ namespace CfiVerifier
 
                     //Phase 1
                     Dictionary<Tuple<string, Cmd, AssertCmd>, bool> storeDB = null, loadDB = null;
-                    if (Options.optimizeStoreITE) 
+                    if (Options.optimizeStoreITE)
                     {
                         Utils.ExtractProgAndImpl(f, out prog, out impl);
                         storeDB = DecideAddressRegions(prog, impl, true);
                     }
 
-                    if (Options.optimizeLoadITE) 
+                    if (Options.optimizeLoadITE)
                     {
                         Utils.ExtractProgAndImpl(f, out prog, out impl);
                         loadDB = DecideAddressRegions(prog, impl, false);
@@ -72,10 +72,10 @@ namespace CfiVerifier
             (new IndiscriminateAssumeSlicer()).Visit(prog);
 
             VCSplitter.LaunchVCSplitter(impl);
-            if (store) { 
+            if (store) {
                 (new StoreAddressDecider()).Visit(prog);
                 addressRegionDB = VCSplitter.Instance.VerifyInstrumentedProcedures(prog);
-            } else { 
+            } else {
                 (new LoadAddressDecider()).Visit(prog);
                 addressRegionDB = VCSplitter.Instance.VerifyInstrumentedProcedures(prog);
             }
@@ -86,17 +86,17 @@ namespace CfiVerifier
         }
 
         private static void InstrumentEnclave(
-            Program prog, 
+            Program prog,
             Implementation impl,
-            Dictionary<Tuple<string, Cmd, AssertCmd>, bool> storeAddressRegionDB, 
+            Dictionary<Tuple<string, Cmd, AssertCmd>, bool> storeAddressRegionDB,
             Dictionary<Tuple<string, Cmd, AssertCmd>, bool>  loadAddressRegionDB )
         {
             Console.WriteLine("CfiVerifier found " + impl.Blocks.Count + " basic blocks");
             (new SpecialInstructionLifter()).Visit(prog);
             // (new ConstantExpressionSimplifier()).Visit(prog);
             Utils.PrintProg(prog);
-            if (Options.splitMemoryModel) { 
-                (new SplitMemoryModeler(storeAddressRegionDB, loadAddressRegionDB)).Visit(prog);
+            if (Options.splitMemoryModel) {
+				(new SplitMemoryModeler(storeAddressRegionDB, loadAddressRegionDB, false)).Visit(prog);
                 (new HavocingLoader()).Visit(prog);
             }
             Utils.PrintProg(prog);

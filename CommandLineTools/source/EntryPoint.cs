@@ -28,7 +28,8 @@ namespace CommandLineTools
             Program inputProgram;
             Utils.ParseProgram(args[1], out inputProgram);
             Utils.Assert(inputProgram.Implementations.Count() == 1, "Expecting a single implementation in the program");
-            string outputName = Path.GetFileName(args[2]);
+			string outputName = args[2];
+			string outputBasename = Path.GetFileName(args[2]);
 
             foreach (string choiceString in args[0].Split(',')) {
               ProgramChoice choice = (ProgramChoice)Enum.Parse(typeof(ProgramChoice), choiceString);
@@ -38,7 +39,7 @@ namespace CommandLineTools
                       CLSlicer.Run(inputProgram);
                       break;
                   case ProgramChoice.GRAPH:
-                      CLGraphEmitter.Run(inputProgram, outputName.Split('.').ElementAt(0));
+                      CLGraphEmitter.Run(inputProgram, outputBasename.Split('.').ElementAt(0));
                       break;
                   case ProgramChoice.REMOVE_CODE_BRANCHES:
                       CLRemoveCodeBranches.Run(inputProgram);
@@ -61,6 +62,9 @@ namespace CommandLineTools
                       throw new Exception("Not implemented");
               }
             }
+			TokenTextWriter ttw = new TokenTextWriter(outputName);
+			inputProgram.Emit(ttw);
+			ttw.Close();
         }
     }
 }
