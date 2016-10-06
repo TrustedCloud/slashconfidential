@@ -28,29 +28,24 @@ namespace CommandLineTools
             Program inputProgram;
             Utils.ParseProgram(args[1], out inputProgram);
             Utils.Assert(inputProgram.Implementations.Count() == 1, "Expecting a single implementation in the program");
-			string outputName = args[2];
-			string outputBasename = Path.GetFileName(args[2]);
+            string outputName = args[2];
+            string outputBasename = Path.GetFileName(args[2]);
 
             foreach (string choiceString in args[0].Split(',')) {
-              ProgramChoice choice = (ProgramChoice)Enum.Parse(typeof(ProgramChoice), choiceString);
-              switch (choice)
-              {
+                ProgramChoice choice = (ProgramChoice)Enum.Parse(typeof(ProgramChoice), choiceString);
+                switch (choice)
+                {
                   case ProgramChoice.SLICE:
                       CLSlicer.Run(inputProgram);
                       break;
                   case ProgramChoice.GRAPH:
-                      CLGraphEmitter.Run(inputProgram, outputBasename.Split('.').ElementAt(0));
+                      CLGraphEmitter.Run(inputProgram, outputBasename.Split('.')[0]);
                       break;
                   case ProgramChoice.REMOVE_CODE_BRANCHES:
                       CLRemoveCodeBranches.Run(inputProgram);
                       break;
                   case ProgramChoice.SPLIT_MEMORY:
-                      // TODO
-                      CLMemorySplitter.Run(inputProgram, false);
-                      break;
-                  case ProgramChoice.SPLIT_MEMORY_OPT:
-                      // TODO
-                      CLMemorySplitter.Run(inputProgram, true);
+                      CLMemorySplitter.Run(inputProgram);
                       break;
                   case ProgramChoice.SLICE_PARTITIONS:
                       CLParitionSlicer.Run(inputProgram);
@@ -62,9 +57,9 @@ namespace CommandLineTools
                       throw new Exception("Not implemented");
               }
             }
-			TokenTextWriter ttw = new TokenTextWriter(outputName);
-			inputProgram.Emit(ttw);
-			ttw.Close();
+        TokenTextWriter ttw = new TokenTextWriter(outputName);
+        inputProgram.Emit(ttw);
+        ttw.Close();
         }
     }
 }

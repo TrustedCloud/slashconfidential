@@ -96,30 +96,30 @@ namespace CfiVerifier
                     List<Expr> loadAddresses = getNestedLoadAddresses(ac.Rhss[0]);
                     Utils.Assert(loadAddresses.Select(x => x.ToString()).Distinct().Count() < 2,
                         "Found multiple load expressions in " + ac.Rhss[0].ToString());
-                    Expr load_addr = loadAddresses.Count() > 0 ? loadAddresses[0] : null;
+                    Expr load_addr = loadAddresses.Any() ? loadAddresses[0] : null;
 
                     if (load_addr != null)
                     {
                         Action<NAryExpr, string> RecordAssertion = delegate(NAryExpr assertCondition, string attribute)
                         {
                             AssertCmd assertion = new AssertCmd(Token.NoToken, assertCondition);
-                            assertion.Attributes = new QKeyValue(Token.NoToken, "region", new List<object>() {attribute}, assertion.Attributes);
+                            assertion.Attributes = new QKeyValue(Token.NoToken, "region", new List<object> {attribute}, assertion.Attributes);
                             newCmdSeq.Add(assertion);
                             VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion, Utils.getSlashVerifyCmdType(ac));
                         };
 
-                        NAryExpr condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInBitmap), new List<Expr>() { load_addr });
+                        NAryExpr condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInBitmap), new List<Expr> { load_addr });
                         RecordAssertion(condition, "addrInBitmap");
 
-                        condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInStack), new List<Expr>() { load_addr });
+                        condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInStack), new List<Expr> { load_addr });
                         RecordAssertion(condition, "addrInStack");
 
-                        condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInBitmap), new List<Expr>() { load_addr });
-                        condition = new NAryExpr(Token.NoToken, new UnaryOperator(Token.NoToken, UnaryOperator.Opcode.Not), new List<Expr>() {condition});
+                        condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInBitmap), new List<Expr> { load_addr });
+                        condition = new NAryExpr(Token.NoToken, new UnaryOperator(Token.NoToken, UnaryOperator.Opcode.Not), new List<Expr> {condition});
                         RecordAssertion(condition, "!addrInBitmap");
 
-                        condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInStack), new List<Expr>() { load_addr });
-                        condition = new NAryExpr(Token.NoToken, new UnaryOperator(Token.NoToken, UnaryOperator.Opcode.Not), new List<Expr>() {condition});
+                        condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInStack), new List<Expr> { load_addr });
+                        condition = new NAryExpr(Token.NoToken, new UnaryOperator(Token.NoToken, UnaryOperator.Opcode.Not), new List<Expr> {condition});
                         RecordAssertion(condition, "!addrInStack");
                     }
                 }
@@ -144,7 +144,7 @@ namespace CfiVerifier
         private Constant bitmap_low;
         private Constant bitmap_high;
 
-		private bool splitProgram;
+    private bool splitProgram;
 
         private string current_label;
 
@@ -162,9 +162,9 @@ namespace CfiVerifier
 
             this.mem = Utils.FindGlobalVariableInProgram(node, "mem");
 
-			if (node.GlobalVariables.FirstOrDefault(i => i.Name.Equals("mem_stack")) != null
-			    && node.GlobalVariables.FirstOrDefault(i => i.Name.Equals("mem_bitmap")) != null)
-				this.splitProgram = true;
+      if (node.GlobalVariables.FirstOrDefault(i => i.Name.Equals("mem_stack")) != null
+          && node.GlobalVariables.FirstOrDefault(i => i.Name.Equals("mem_bitmap")) != null)
+        this.splitProgram = true;
 
             return base.VisitProgram(node);
         }
@@ -179,6 +179,18 @@ namespace CfiVerifier
         public override List<Cmd> VisitCmdSeq(List<Cmd> cmdSeq)
         {
             List<Cmd> newCmdSeq = new List<Cmd>();
+            Expr curr_store_addr = null;
+
+            Action<NAryExpr, string, AssignCmd> RecordAssertion = delegate(NAryExpr assertCondition, string attribute, AssignCmd memAssignCmd)
+            {
+                AssertCmd assertion = new AssertCmd(Token.NoToken, assertCondition);
+                //we use the attribute in a separate pass within the split memory modeler
+                assertion.Attributes = new QKeyValue(Token.NoToken, "region", new List<object> { attribute }, assertion.Attributes);
+                newCmdSeq.Add(assertion);
+                //current_label is the current block, ac is the STORE associated with the assertiion
+                VCSplitter.Instance.RecordAssertion(this.current_label, memAssignCmd, assertion, Utils.getSlashVerifyCmdType(memAssignCmd));
+            };
+
             foreach (Cmd c in cmdSeq)
             {
                 if (c is AssignCmd)
@@ -193,36 +205,30 @@ namespace CfiVerifier
                         case SlashVerifyCmdType.Store32:
                         case SlashVerifyCmdType.Store64: //mem := store(mem, y, e)
                             {
-								if (splitProgram)
-									break;
-
                                 Tuple<Variable, Expr, Expr> storeArgs = Utils.getStoreArgs(ac);
                                 Expr store_addr = storeArgs.Item2;
                                 Expr store_value = storeArgs.Item3;
 
-                                Action<NAryExpr, string> RecordAssertion = delegate(NAryExpr assertCondition, string attribute)
-                                {
-                                    AssertCmd assertion = new AssertCmd(Token.NoToken, assertCondition);
-                                    //we use the attribute in a separate pass within the split memory modeler
-                                    assertion.Attributes = new QKeyValue(Token.NoToken, "region", new List<object>() { attribute }, assertion.Attributes);
-                                    newCmdSeq.Add(assertion);
-                                    //current_label is the current block, ac is the STORE associated with the assertiion
-                                    VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion, Utils.getSlashVerifyCmdType(ac));
-                                };
+                                if (splitProgram) {
+                                    curr_store_addr = store_addr;
+                                    newCmdSeq.Add(c);
+                                    break;
+                                }
 
-                                NAryExpr condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInBitmap), new List<Expr>() { store_addr });
-                                RecordAssertion(condition, "addrInBitmap");
 
-                                condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInStack), new List<Expr>() { store_addr });
-                                RecordAssertion(condition, "addrInStack");
+                                NAryExpr condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInBitmap), new List<Expr> { store_addr });
+                                RecordAssertion(condition, "addrInBitmap", ac);
 
-                                condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInBitmap), new List<Expr>() { store_addr });
-                                condition = new NAryExpr(Token.NoToken, new UnaryOperator(Token.NoToken, UnaryOperator.Opcode.Not), new List<Expr>() {condition});
-                                RecordAssertion(condition, "!addrInBitmap");
+                                condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInStack), new List<Expr> { store_addr });
+                                RecordAssertion(condition, "addrInStack", ac);
 
-                                condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInStack), new List<Expr>() { store_addr });
-                                condition = new NAryExpr(Token.NoToken, new UnaryOperator(Token.NoToken, UnaryOperator.Opcode.Not), new List<Expr>() {condition});
-                                RecordAssertion(condition, "!addrInStack");
+                                condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInBitmap), new List<Expr> { store_addr });
+                                condition = new NAryExpr(Token.NoToken, new UnaryOperator(Token.NoToken, UnaryOperator.Opcode.Not), new List<Expr> {condition});
+                                RecordAssertion(condition, "!addrInBitmap", ac);
+
+                                condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInStack), new List<Expr> { store_addr });
+                                condition = new NAryExpr(Token.NoToken, new UnaryOperator(Token.NoToken, UnaryOperator.Opcode.Not), new List<Expr> {condition});
+                                RecordAssertion(condition, "!addrInStack", ac);
 
                                 //Expr addr_in_mem =
                                 //    Expr.And(
@@ -242,11 +248,33 @@ namespace CfiVerifier
 
                         default: //x:=e
                             {
+                                // NOTE: This assumes there is a STORE assignment
+                                //  to mem at the correct address prior to the
+                                //  following mem_bitmap and mem_stack
+                                //  assignments
+                                if (ac.Lhss.First().DeepAssignedVariable.Name.Equals("mem_stack")) {
+                                    Utils.Assert(curr_store_addr != null, "Expected assignment to \"mem\" variable!");
+                                    NAryExpr condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInStack), new List<Expr> { curr_store_addr });
+                                    RecordAssertion(condition, "addrInStack", ac);
+
+                                    condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInStack), new List<Expr> { curr_store_addr });
+                                    condition = new NAryExpr(Token.NoToken, new UnaryOperator(Token.NoToken, UnaryOperator.Opcode.Not), new List<Expr> {condition});
+                                    RecordAssertion(condition, "!addrInStack", ac);
+                                }
+                                else if (ac.Lhss.First().DeepAssignedVariable.Name.Equals("mem_bitmp")) {
+                                    Utils.Assert(curr_store_addr != null, "Expected assignment to \"mem\" variable!");
+                                    NAryExpr condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInBitmap), new List<Expr> { curr_store_addr });
+                                    RecordAssertion(condition, "addrInBitmap", ac);
+
+                                    condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInBitmap), new List<Expr> { curr_store_addr });
+                                    condition = new NAryExpr(Token.NoToken, new UnaryOperator(Token.NoToken, UnaryOperator.Opcode.Not), new List<Expr> {condition});
+                                    RecordAssertion(condition, "!addrInBitmap", ac);
+                                }
                                 break;
                             }
                     }
 
-					// TODO handle ITE case
+          // TODO handle ITE case
                 }
 
                 //The assert gets placed prior to the original command
@@ -264,18 +292,18 @@ namespace CfiVerifier
         private string current_label;
         private Dictionary<Tuple<string, Cmd, AssertCmd>, bool> storeAddressRegionDB;
         private Dictionary<Tuple<string, Cmd, AssertCmd>, bool> loadAddressRegionDB;
-		private bool splitProgram;
+        private bool splitProgram;
 
         enum AddrType { Unknown, StackAddress, BitmapAddress, MemAddress };
 
         public SplitMemoryModeler(
             Dictionary<Tuple<string, Cmd, AssertCmd>, bool> storeAddressRegionDB,
             Dictionary<Tuple<string, Cmd, AssertCmd>, bool> loadAddressRegionDB,
-			bool splitProgram)
+            bool splitProgram)
         {
             this.storeAddressRegionDB = storeAddressRegionDB;
             this.loadAddressRegionDB = loadAddressRegionDB;
-			this.splitProgram = splitProgram;
+            this.splitProgram = splitProgram;
         }
 
         public override Program VisitProgram(Program node)
@@ -286,18 +314,18 @@ namespace CfiVerifier
             this.addrInStack = Utils.FindFunctionInProgram(node, "addrInStack");
             this.mem = Utils.FindGlobalVariableInProgram(node, "mem");
 
-			if (this.splitProgram)
-			{
-				this.mem_stack = Utils.MkGlobalVar("mem_stack", this.mem.TypedIdent.Type);
-				node.AddTopLevelDeclaration(this.mem_stack); //add as global variable
-				this.mem_bitmap = Utils.MkGlobalVar("mem_bitmap", this.mem.TypedIdent.Type);
-				node.AddTopLevelDeclaration(this.mem_bitmap); //add as global variable
-			}
-			else
-			{
-				this.mem_stack = Utils.FindGlobalVariableInProgram(node, "mem_stack");
-				this.mem_bitmap = Utils.FindGlobalVariableInProgram(node, "mem_bitmap");
-			}
+            if (this.splitProgram)
+            {
+              this.mem_stack = Utils.MkGlobalVar("mem_stack", this.mem.TypedIdent.Type);
+              node.AddTopLevelDeclaration(this.mem_stack); //add as global variable
+              this.mem_bitmap = Utils.MkGlobalVar("mem_bitmap", this.mem.TypedIdent.Type);
+              node.AddTopLevelDeclaration(this.mem_bitmap); //add as global variable
+            }
+            else
+            {
+              this.mem_stack = Utils.FindGlobalVariableInProgram(node, "mem_stack");
+              this.mem_bitmap = Utils.FindGlobalVariableInProgram(node, "mem_bitmap");
+            }
 
             return base.VisitProgram(node);
         }
@@ -305,6 +333,7 @@ namespace CfiVerifier
         public override Implementation VisitImplementation(Implementation node)
         {
             if (!Options.splitMemoryModel) { return base.VisitImplementation(node); }
+            if (this.splitProgram)         { return base.VisitImplementation(node); }
 
             node.Proc.Modifies.Add(new IdentifierExpr(Token.NoToken, this.mem_bitmap));
             node.Proc.Modifies.Add(new IdentifierExpr(Token.NoToken, this.mem_stack));
@@ -371,19 +400,19 @@ namespace CfiVerifier
                 }
                 else
                 {
-                    Expr isAddrInBitmap = new NAryExpr(Token.NoToken, new FunctionCall(this.addrInBitmap), new List<Expr>() { addr });
-                    Expr isAddrInStack = new NAryExpr(Token.NoToken, new FunctionCall(this.addrInStack), new List<Expr>() { addr });
+                    Expr isAddrInBitmap = new NAryExpr(Token.NoToken, new FunctionCall(this.addrInBitmap), new List<Expr> { addr });
+                    Expr isAddrInStack = new NAryExpr(Token.NoToken, new FunctionCall(this.addrInStack), new List<Expr> { addr });
 
                     Expr tmp = new IdentifierExpr(Token.NoToken, mem);
                     if (!notBitmap) //may target the bitmap
                     {
-                        tmp = new NAryExpr(Token.NoToken, new IfThenElse(Token.NoToken), new List<Expr>() {
+                        tmp = new NAryExpr(Token.NoToken, new IfThenElse(Token.NoToken), new List<Expr> {
                                             isAddrInBitmap, new IdentifierExpr(Token.NoToken, this.mem_bitmap), tmp});
                     }
 
                     if (!notStack) //may target the stack
                     {
-                        tmp = new NAryExpr(Token.NoToken, new IfThenElse(Token.NoToken), new List<Expr>() {
+                        tmp = new NAryExpr(Token.NoToken, new IfThenElse(Token.NoToken), new List<Expr> {
                                             isAddrInStack, new IdentifierExpr(Token.NoToken, this.mem_stack), tmp});
                     }
                     return tmp;
@@ -474,7 +503,7 @@ namespace CfiVerifier
                 {
                     AssignCmd ac = c as AssignCmd;
                     Utils.Assert(ac.Lhss.Count == 1 && ac.Rhss.Count == 1, "Not handling parallel AssignCmd");
-                    ac = new AssignCmd(Token.NoToken, new List<AssignLhs>() { ac.Lhss[0] }, new List<Expr>() { transformLoad(this.current_label, c, ac.Rhss[0]) });
+                    ac = new AssignCmd(Token.NoToken, new List<AssignLhs> { ac.Lhss[0] }, new List<Expr> { transformLoad(this.current_label, c, ac.Rhss[0]) });
 
                     switch (Utils.getSlashVerifyCmdType(ac))
                     {
@@ -500,10 +529,10 @@ namespace CfiVerifier
                                 {
                                     //adds mem_stack := STORE(mem_stack, addr, value);
                                     AssignCmd new_ac = new AssignCmd(Token.NoToken,
-                                        new List<AssignLhs>() { new SimpleAssignLhs(Token.NoToken, new IdentifierExpr(Token.NoToken, this.mem_stack)) },
-                                        new List<Expr>() { new NAryExpr(Token.NoToken,
+                                        new List<AssignLhs> { new SimpleAssignLhs(Token.NoToken, new IdentifierExpr(Token.NoToken, this.mem_stack)) },
+                                        new List<Expr> { new NAryExpr(Token.NoToken,
                                                                             (ac.Rhss[0] as NAryExpr).Fun,
-                                                                            new List<Expr>() { new IdentifierExpr(Token.NoToken, this.mem_stack),
+                                                                            new List<Expr> { new IdentifierExpr(Token.NoToken, this.mem_stack),
                                                                                                store_addr,
                                                                                                store_value }) });
                                     newCmdSeq.Add(new_ac);
@@ -512,21 +541,21 @@ namespace CfiVerifier
                                 {
                                     //adds mem_bitmap := STORE(mem_bitmap, addr, value);
                                     AssignCmd new_ac = new AssignCmd(Token.NoToken,
-                                        new List<AssignLhs>() { new SimpleAssignLhs(Token.NoToken, new IdentifierExpr(Token.NoToken, this.mem_bitmap)) },
-                                        new List<Expr>() { new NAryExpr(Token.NoToken,
+                                        new List<AssignLhs> { new SimpleAssignLhs(Token.NoToken, new IdentifierExpr(Token.NoToken, this.mem_bitmap)) },
+                                        new List<Expr> { new NAryExpr(Token.NoToken,
                                                                             (ac.Rhss[0] as NAryExpr).Fun,
-                                                                            new List<Expr>() { new IdentifierExpr(Token.NoToken, this.mem_bitmap),
+                                                                            new List<Expr> { new IdentifierExpr(Token.NoToken, this.mem_bitmap),
                                                                                                store_addr,
                                                                                                store_value }) });
                                     newCmdSeq.Add(new_ac);
                                 }
                                 else
                                 {
-									if (this.splitProgram)
-										break;
+                                    if (this.splitProgram)
+                                        break;
 
-                                    Expr isAddrInBitmap = new NAryExpr(Token.NoToken, new FunctionCall(this.addrInBitmap), new List<Expr>() { store_addr });
-                                    Expr isAddrInStack = new NAryExpr(Token.NoToken, new FunctionCall(this.addrInStack), new List<Expr>() { store_addr });
+                                    Expr isAddrInBitmap = new NAryExpr(Token.NoToken, new FunctionCall(this.addrInBitmap), new List<Expr> { store_addr });
+                                    Expr isAddrInStack = new NAryExpr(Token.NoToken, new FunctionCall(this.addrInStack), new List<Expr> { store_addr });
 
                                     newCmdSeq.Add(ac);
 
@@ -535,13 +564,13 @@ namespace CfiVerifier
                                     // mem_stack := ITE(isAddrInStack(storeAddr), STORE(mem_stack, addr, value), mem_stack);
                                     if (!isNotStackAddress(this.current_label, c, this.storeAddressRegionDB))
                                     {
-                                        rhs = new NAryExpr(Token.NoToken, new IfThenElse(Token.NoToken), new List<Expr>() {
+                                        rhs = new NAryExpr(Token.NoToken, new IfThenElse(Token.NoToken), new List<Expr> {
                                                 isAddrInStack,
-                                                new NAryExpr(Token.NoToken, (ac.Rhss[0] as NAryExpr).Fun, new List<Expr>() { new IdentifierExpr(Token.NoToken, this.mem_stack), store_addr, store_value }),
+                                                new NAryExpr(Token.NoToken, (ac.Rhss[0] as NAryExpr).Fun, new List<Expr> { new IdentifierExpr(Token.NoToken, this.mem_stack), store_addr, store_value }),
                                                 new IdentifierExpr(Token.NoToken, this.mem_stack) });
                                         AssignCmd stack_ac = new AssignCmd(Token.NoToken,
-                                            new List<AssignLhs>() { new SimpleAssignLhs(Token.NoToken, new IdentifierExpr(Token.NoToken, this.mem_stack)) },
-                                            new List<Expr>() { rhs });
+                                            new List<AssignLhs> { new SimpleAssignLhs(Token.NoToken, new IdentifierExpr(Token.NoToken, this.mem_stack)) },
+                                            new List<Expr> { rhs });
                                         newCmdSeq.Add(stack_ac);
                                     }
 
@@ -549,13 +578,13 @@ namespace CfiVerifier
                                     // mem_bitmap := ITE(isAddrInBitmap(storeAddr), STORE(mem_bitmap, addr, value), mem_bitmap);
                                     if (!isNotBitmapAddress(this.current_label, c, this.storeAddressRegionDB))
                                     {
-                                        rhs = new NAryExpr(Token.NoToken, new IfThenElse(Token.NoToken), new List<Expr>() {
+                                        rhs = new NAryExpr(Token.NoToken, new IfThenElse(Token.NoToken), new List<Expr> {
                                             isAddrInBitmap,
-                                            new NAryExpr(Token.NoToken, (ac.Rhss[0] as NAryExpr).Fun, new List<Expr>() { new IdentifierExpr(Token.NoToken, this.mem_bitmap), store_addr, store_value }),
+                                            new NAryExpr(Token.NoToken, (ac.Rhss[0] as NAryExpr).Fun, new List<Expr> { new IdentifierExpr(Token.NoToken, this.mem_bitmap), store_addr, store_value }),
                                             new IdentifierExpr(Token.NoToken, this.mem_bitmap) });
                                         AssignCmd bitmap_ac = new AssignCmd(Token.NoToken,
-                                            new List<AssignLhs>() { new SimpleAssignLhs(Token.NoToken, new IdentifierExpr(Token.NoToken, this.mem_bitmap)) },
-                                            new List<Expr>() { rhs });
+                                            new List<AssignLhs> { new SimpleAssignLhs(Token.NoToken, new IdentifierExpr(Token.NoToken, this.mem_bitmap)) },
+                                            new List<Expr> { rhs });
                                         newCmdSeq.Add(bitmap_ac);
                                     }
                                 }
@@ -569,24 +598,24 @@ namespace CfiVerifier
                                 Expr base_addr = repstosArgs.Item3;
                                 Expr length = repstosArgs.Item2;
 
-                                Expr isAddrInBitmap = new NAryExpr(Token.NoToken, new FunctionCall(this.addrInBitmap), new List<Expr>() { base_addr });
-                                Expr isAddrInStack = new NAryExpr(Token.NoToken, new FunctionCall(this.addrInStack), new List<Expr>() { base_addr });
+                                Expr isAddrInBitmap = new NAryExpr(Token.NoToken, new FunctionCall(this.addrInBitmap), new List<Expr> { base_addr });
+                                Expr isAddrInStack = new NAryExpr(Token.NoToken, new FunctionCall(this.addrInStack), new List<Expr> { base_addr });
 
-                                Expr rhs = new NAryExpr(Token.NoToken, new IfThenElse(Token.NoToken), new List<Expr>() {
+                                Expr rhs = new NAryExpr(Token.NoToken, new IfThenElse(Token.NoToken), new List<Expr> {
                                             isAddrInStack,
                                             new NAryExpr(Token.NoToken,
                                                 (ac.Rhss[0] as NAryExpr).Fun,
-                                                new List<Expr>() { new IdentifierExpr(Token.NoToken, this.mem_stack), repstosArgs.Item2, repstosArgs.Item3, repstosArgs.Item4 }),
+                                                new List<Expr> { new IdentifierExpr(Token.NoToken, this.mem_stack), repstosArgs.Item2, repstosArgs.Item3, repstosArgs.Item4 }),
                                             new IdentifierExpr(Token.NoToken, this.mem_stack) });
                                 AssignCmd stack_ac = new AssignCmd(Token.NoToken,
-                                    new List<AssignLhs>() { new SimpleAssignLhs(Token.NoToken, new IdentifierExpr(Token.NoToken, this.mem_stack)) },
-                                    new List<Expr>() { rhs });
+                                    new List<AssignLhs> { new SimpleAssignLhs(Token.NoToken, new IdentifierExpr(Token.NoToken, this.mem_stack)) },
+                                    new List<Expr> { rhs });
 
-                                rhs = new NAryExpr(Token.NoToken, new IfThenElse(Token.NoToken), new List<Expr>() {
+                                rhs = new NAryExpr(Token.NoToken, new IfThenElse(Token.NoToken), new List<Expr> {
                                             isAddrInBitmap,
                                             new NAryExpr(Token.NoToken,
                                                 (ac.Rhss[0] as NAryExpr).Fun,
-                                                new List<Expr>() { new IdentifierExpr(Token.NoToken, this.mem_bitmap), repstosArgs.Item2, repstosArgs.Item3, repstosArgs.Item4 }),
+                                                new List<Expr> { new IdentifierExpr(Token.NoToken, this.mem_bitmap), repstosArgs.Item2, repstosArgs.Item3, repstosArgs.Item4 }),
                                             new IdentifierExpr(Token.NoToken, this.mem_bitmap) });
                                 AssignCmd bitmap_ac = new AssignCmd(Token.NoToken,
                                     new List<AssignLhs>() { new SimpleAssignLhs(Token.NoToken, new IdentifierExpr(Token.NoToken, this.mem_bitmap)) },

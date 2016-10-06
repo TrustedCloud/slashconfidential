@@ -3,8 +3,6 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
-    <ProductVersion>8.0.30703</ProductVersion>
-    <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>{053B9089-ECF9-4B67-9858-4F2C78502BBF}</ProjectGuid>
     <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
@@ -41,6 +39,7 @@
     <WarningLevel>4</WarningLevel>
     <UseVSHostingProcess>false</UseVSHostingProcess>
     <Prefer32Bit>false</Prefer32Bit>
+    <Commandlineparameters>../../../benchmarks/IoVolumes/func_0000000000001000/dll_func.bpl /instrumentedFile:../../../benchmarks/IoVolumes/func_0000000000001000/dll_func_instrumented.bpl /splitFiles /splitFilesDir:../../../benchmarks/IoVolumes/func_0000000000001000   /confidentiality+ /instantiateQuantifiers+ /funcNew:2f60 /funcGuardCheckIcallCfw:50d0 /funcMemset:3960 /funcMemcpy:3bb0 /funcMemcmp:3e80 /funcSGXMalloc:4fa0 /funcSGXFree:4fa6 /dataLow:7000 /dataHigh:71ef /tag:baseline /splitMemoryModel+ /optimizeStoreITE+ /optimizeLoadITE+</Commandlineparameters>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x86' ">
     <PlatformTarget>x86</PlatformTarget>
@@ -147,12 +146,11 @@
     <Reference Include="System.Data" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="System.Data.Linq" />
-    <Reference Include="System.XML" />
     <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
-    <None Include="ClassDiagram1.cd" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

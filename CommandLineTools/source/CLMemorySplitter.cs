@@ -13,7 +13,7 @@ namespace CommandLineTools
 {
     class CLMemorySplitter
     {
-        public static void Run(Program input, bool processed)
+        public static void Run(Program input)
         {
             StringWriter sw = new StringWriter();
             TokenTextWriter ttw = new TokenTextWriter(sw);
@@ -24,16 +24,14 @@ namespace CommandLineTools
             Options.splitFiles = true; // HACK
             Program prog;
             Utils.ParseString(sw.ToString(), out prog);
-            if (!processed)
-                CodeProcess(prog);
+            CodeProcess(prog);
             Dictionary<Tuple<string, Cmd, AssertCmd>, bool> storeAddressRegionDB = DecideAddressRegions(prog, true);
             Utils.ParseString(sw.ToString(), out prog);
-            if (!processed)
-                CodeProcess(prog);
+            CodeProcess(prog);
             Dictionary<Tuple<string, Cmd, AssertCmd>, bool> loadAddressRegionDB = DecideAddressRegions(prog, false);
             Utils.ParseString(sw.ToString(), out prog);
             Options.splitMemoryModel = true;
-			(new SplitMemoryModeler(storeAddressRegionDB, loadAddressRegionDB, Utils.ProgramIsSplit(input))).Visit(input);
+      (new SplitMemoryModeler(storeAddressRegionDB, loadAddressRegionDB, Utils.ProgramIsSplit(input))).Visit(input);
             sw.Close();
         }
 
