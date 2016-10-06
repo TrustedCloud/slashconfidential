@@ -144,7 +144,7 @@ namespace CfiVerifier
         private Constant bitmap_low;
         private Constant bitmap_high;
 
-    private bool splitProgram;
+        private bool splitProgram;
 
         private string current_label;
 
@@ -162,9 +162,9 @@ namespace CfiVerifier
 
             this.mem = Utils.FindGlobalVariableInProgram(node, "mem");
 
-      if (node.GlobalVariables.FirstOrDefault(i => i.Name.Equals("mem_stack")) != null
-          && node.GlobalVariables.FirstOrDefault(i => i.Name.Equals("mem_bitmap")) != null)
-        this.splitProgram = true;
+            if (node.GlobalVariables.FirstOrDefault(i => i.Name.Equals("mem_stack")) != null
+                  && node.GlobalVariables.FirstOrDefault(i => i.Name.Equals("mem_bitmap")) != null)
+                this.splitProgram = true;
 
             return base.VisitProgram(node);
         }
@@ -179,7 +179,6 @@ namespace CfiVerifier
         public override List<Cmd> VisitCmdSeq(List<Cmd> cmdSeq)
         {
             List<Cmd> newCmdSeq = new List<Cmd>();
-            Expr curr_store_addr = null;
 
             Action<NAryExpr, string, AssignCmd> RecordAssertion = delegate(NAryExpr assertCondition, string attribute, AssignCmd memAssignCmd)
             {
@@ -210,7 +209,6 @@ namespace CfiVerifier
                                 Expr store_value = storeArgs.Item3;
 
                                 if (splitProgram) {
-                                    curr_store_addr = store_addr;
                                     newCmdSeq.Add(c);
                                     break;
                                 }
@@ -248,25 +246,21 @@ namespace CfiVerifier
 
                         default: //x:=e
                             {
-                                // NOTE: This assumes there is a STORE assignment
-                                //  to mem at the correct address prior to the
-                                //  following mem_bitmap and mem_stack
-                                //  assignments
                                 if (ac.Lhss.First().DeepAssignedVariable.Name.Equals("mem_stack")) {
-                                    Utils.Assert(curr_store_addr != null, "Expected assignment to \"mem\" variable!");
-                                    NAryExpr condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInStack), new List<Expr> { curr_store_addr });
+                                    Expr address = Utils.getSplitMemoryOperationAddress(ac);
+                                    NAryExpr condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInStack), new List<Expr> { address });
                                     RecordAssertion(condition, "addrInStack", ac);
 
-                                    condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInStack), new List<Expr> { curr_store_addr });
+                                    condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInStack), new List<Expr> { address });
                                     condition = new NAryExpr(Token.NoToken, new UnaryOperator(Token.NoToken, UnaryOperator.Opcode.Not), new List<Expr> {condition});
                                     RecordAssertion(condition, "!addrInStack", ac);
                                 }
-                                else if (ac.Lhss.First().DeepAssignedVariable.Name.Equals("mem_bitmp")) {
-                                    Utils.Assert(curr_store_addr != null, "Expected assignment to \"mem\" variable!");
-                                    NAryExpr condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInBitmap), new List<Expr> { curr_store_addr });
+                                else if (ac.Lhss.First().DeepAssignedVariable.Name.Equals("mem_bitmap")) {
+                                    Expr address = Utils.getSplitMemoryOperationAddress(ac);
+                                    NAryExpr condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInBitmap), new List<Expr> { address });
                                     RecordAssertion(condition, "addrInBitmap", ac);
 
-                                    condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInBitmap), new List<Expr> { curr_store_addr });
+                                    condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInBitmap), new List<Expr> { address });
                                     condition = new NAryExpr(Token.NoToken, new UnaryOperator(Token.NoToken, UnaryOperator.Opcode.Not), new List<Expr> {condition});
                                     RecordAssertion(condition, "!addrInBitmap", ac);
                                 }
@@ -314,7 +308,7 @@ namespace CfiVerifier
             this.addrInStack = Utils.FindFunctionInProgram(node, "addrInStack");
             this.mem = Utils.FindGlobalVariableInProgram(node, "mem");
 
-            if (this.splitProgram)
+            if (!this.splitProgram)
             {
               this.mem_stack = Utils.MkGlobalVar("mem_stack", this.mem.TypedIdent.Type);
               node.AddTopLevelDeclaration(this.mem_stack); //add as global variable
@@ -551,8 +545,12 @@ namespace CfiVerifier
                                 }
                                 else
                                 {
-                                    if (this.splitProgram)
+                                    if (this.splitProgram) {
+                                        if (!isBitmapAddress(this.current_label, c, this.storeAddressRegionDB)
+                                                && !isStackAddress(this.current_label, c, this.storeAddressRegionDB))
+                                            newCmdSeq.Add(ac);
                                         break;
+                                    }
 
                                     Expr isAddrInBitmap = new NAryExpr(Token.NoToken, new FunctionCall(this.addrInBitmap), new List<Expr> { store_addr });
                                     Expr isAddrInStack = new NAryExpr(Token.NoToken, new FunctionCall(this.addrInStack), new List<Expr> { store_addr });
@@ -630,6 +628,26 @@ namespace CfiVerifier
 
                         default:
                             {
+                                if (ac.Lhss.First().DeepAssignedVariable.Name.Equals("mem_stack")) {
+                                    if (isBitmapAddress(this.current_label, c, this.storeAddressRegionDB)
+                                          || isNotStackAddress(this.current_label, c, this.storeAddressRegionDB))
+                                        break;
+                                    else if (isStackAddress(this.current_label, c, this.storeAddressRegionDB)) {
+                                        AssignCmd updateStack = new AssignCmd(Token.NoToken, new List<AssignLhs> {new SimpleAssignLhs(Token.NoToken, new IdentifierExpr(Token.NoToken, this.mem_stack))}, new List<Expr> { Utils.getSplitMemoryUpdateExpr(ac) });
+                                        newCmdSeq.Add(updateStack);
+                                        break;
+                                    }
+                                }
+                                else if (ac.Lhss.First().DeepAssignedVariable.Name.Equals("mem_bitmap")) {
+                                    if (isStackAddress(this.current_label, c, this.storeAddressRegionDB)
+                                          || isNotBitmapAddress(this.current_label, c, this.storeAddressRegionDB))
+                                        break;
+                                    else if (isBitmapAddress(this.current_label, c, this.storeAddressRegionDB)) {
+                                        AssignCmd updateBitmap = new AssignCmd(Token.NoToken, new List<AssignLhs> {new SimpleAssignLhs(Token.NoToken, new IdentifierExpr(Token.NoToken, this.mem_bitmap))}, new List<Expr> { Utils.getSplitMemoryUpdateExpr(ac) });
+                                        newCmdSeq.Add(updateBitmap);
+                                        break;
+                                    }
+                                }
                                 newCmdSeq.Add(ac);
                                 break;
                             }

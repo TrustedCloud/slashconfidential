@@ -273,6 +273,20 @@ namespace CfiVerifier
                 ((NAryExpr)rhs).Args[2]);
         }
 
+        public static Expr getSplitMemoryOperationAddress(AssignCmd c) {
+            Utils.Assert(c.Lhss.Count == 1 && c.Rhss.Count == 1, "getSplitMemoryOperationAddress not handling parallel assignCmds");
+            NAryExpr rhs = c.Rhss[0] as NAryExpr;
+            Utils.Assert(rhs.Fun.GetType().Equals(typeof(Microsoft.Boogie.IfThenElse)));
+            return (rhs.Args[0] as NAryExpr).Args[0];
+        }
+
+        public static Expr getSplitMemoryUpdateExpr(AssignCmd c) {
+            Utils.Assert(c.Lhss.Count == 1 && c.Rhss.Count == 1, "getSplitMemoryUpdateExpr not handling parallel assignCmds");
+            NAryExpr rhs = c.Rhss[0] as NAryExpr;
+            Utils.Assert(rhs.Fun.GetType().Equals(typeof(Microsoft.Boogie.IfThenElse)));
+            return rhs.Args[1];
+        }
+
         /* returns (mem, rcx, rdi, al) */
         public static Tuple<Variable, Expr, Expr, Expr> getRepStosbArgs(AssignCmd c)
         {

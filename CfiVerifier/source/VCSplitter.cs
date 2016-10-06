@@ -27,6 +27,7 @@ namespace CfiVerifier
         private Cmd target_typedCmd;
         private AssertCmd target_assertion;
         private bool target_acquired;
+        private bool splitting = false;
 
         private VCSplitter() { }
 
@@ -57,6 +58,8 @@ namespace CfiVerifier
             List<Cmd> newCmdSeq = new List<Cmd>();
             foreach (Cmd c in cmdSeq)
             {
+                if (this.splitting && c is AssertCmd && QKeyValue.FindBoolAttribute((c as AssertCmd).Attributes, "source_assert"))
+                    continue;
                 if (this.current_label == this.target_label && EquivalentCmd(c, this.target_typedCmd))
                 {
                     newCmdSeq.Add(this.target_assertion);
@@ -127,6 +130,7 @@ namespace CfiVerifier
         {
             var delim = Options.IsLinux() ? @"/" : @"\";
             string binaryName = @"." + delim + "references" + delim + "Boogie.exe";
+			//string binaryName = @"../../../references/Boogie.exe";
             //Func<string, string> ProcessOutput = delegate(string s) { return ("The number of lines in output = " + s.Split('\n').Count().ToString()); };
             Func<string, bool> result = delegate(string s)
             {
@@ -185,6 +189,7 @@ namespace CfiVerifier
                         new_prog.AddTopLevelDeclaration(d);
                     else
                     {
+                        this.splitting = true;
                         new_impl = instrumentAssertion(original_impl, assertion.Item1, assertion.Item2, assertion.Item3);
                         new_prog.AddTopLevelDeclaration(new_impl);
                     }

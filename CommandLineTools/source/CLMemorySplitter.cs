@@ -25,13 +25,13 @@ namespace CommandLineTools
             Program prog;
             Utils.ParseString(sw.ToString(), out prog);
             CodeProcess(prog);
-            Dictionary<Tuple<string, Cmd, AssertCmd>, bool> storeAddressRegionDB = DecideAddressRegions(prog, true);
-            Utils.ParseString(sw.ToString(), out prog);
-            CodeProcess(prog);
             Dictionary<Tuple<string, Cmd, AssertCmd>, bool> loadAddressRegionDB = DecideAddressRegions(prog, false);
             Utils.ParseString(sw.ToString(), out prog);
+            CodeProcess(prog);
+            Dictionary<Tuple<string, Cmd, AssertCmd>, bool> storeAddressRegionDB = DecideAddressRegions(prog, true);
+            Utils.ParseString(sw.ToString(), out prog);
             Options.splitMemoryModel = true;
-      (new SplitMemoryModeler(storeAddressRegionDB, loadAddressRegionDB, Utils.ProgramIsSplit(input))).Visit(input);
+            (new SplitMemoryModeler(storeAddressRegionDB, loadAddressRegionDB, Utils.ProgramIsSplit(input))).Visit(input);
             sw.Close();
         }
 
