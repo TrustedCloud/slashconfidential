@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -36,6 +36,8 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <ConsolePause>false</ConsolePause>
+    <Commandlineparameters>SPLIT_MEMORY ../../../d1.bpl ../../../d1_proc.out</Commandlineparameters>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -111,6 +113,7 @@
     <Compile Include="source\EntryPoint.cs" />
     <Compile Include="source\CLSlicer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="source\CLLoadExtractor.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
@@ -121,7 +124,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\CfiVerifier\CfiVerifier.csproj">
-      <Project>{053b9089-ecf9-4b67-9858-4f2c78502bbf}</Project>
+      <Project>{053B9089-ECF9-4B67-9858-4F2C78502BBF}</Project>
       <Name>CfiVerifier</Name>
     </ProjectReference>
   </ItemGroup>

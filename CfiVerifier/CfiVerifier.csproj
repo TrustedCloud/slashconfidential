@@ -39,7 +39,7 @@
     <WarningLevel>4</WarningLevel>
     <UseVSHostingProcess>false</UseVSHostingProcess>
     <Prefer32Bit>false</Prefer32Bit>
-    <Commandlineparameters>../../../benchmarks/IoVolumes/func_0000000000001000/dll_func.bpl /instrumentedFile:../../../benchmarks/IoVolumes/func_0000000000001000/dll_func_instrumented.bpl /splitFiles /splitFilesDir:../../../benchmarks/IoVolumes/func_0000000000001000   /confidentiality+ /instantiateQuantifiers+ /funcNew:2f60 /funcGuardCheckIcallCfw:50d0 /funcMemset:3960 /funcMemcpy:3bb0 /funcMemcmp:3e80 /funcSGXMalloc:4fa0 /funcSGXFree:4fa6 /dataLow:7000 /dataHigh:71ef /tag:baseline /splitMemoryModel+ /optimizeStoreITE+ /optimizeLoadITE+</Commandlineparameters>
+    <Commandlineparameters>../../../benchmarks/IoVolumes/func_0000000000003B90/dll_func.bpl /instrumentedFile:../../../benchmarks/IoVolumes/func_0000000000003B90/dll_func_instrumented.bpl /splitFiles /splitFilesDir:../../../benchmarks/IoVolumes/func_0000000000003B90   /confidentiality+ /instantiateQuantifiers+ /funcNew:2f60 /funcGuardCheckIcallCfw:50d0 /funcMemset:3960 /funcMemcpy:3bb0 /funcMemcmp:3e80 /funcSGXMalloc:4fa0 /funcSGXFree:4fa6 /dataLow:7000 /dataHigh:71ef /tag:baseline /splitMemoryModel+ /optimizeStoreITE+ /optimizeLoadITE+</Commandlineparameters>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x86' ">
     <PlatformTarget>x86</PlatformTarget>
@@ -73,6 +73,7 @@
     <Compile Include="source\Slicer.cs" />
     <Compile Include="source\Utils.cs" />
     <Compile Include="source\VCSplitter.cs" />
+    <Compile Include="source\LoadExtractor.cs" />
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include=".NETFramework,Version=v4.0,Profile=Client">
