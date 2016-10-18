@@ -422,7 +422,9 @@ namespace CfiVerifier
                     return new IdentifierExpr(Token.NoToken, this.mem_bitmap);
                 }
                 Expr addr = load_info.Item2;
-                List<string> targetedMemSpacesNames = Utils.getSplitMemoryAccessSpace(load_info.Item1 as NAryExpr).Select(i => i.Decl.Name).ToList();
+                List<string> targetedMemSpacesNames = this.splitProgram ?
+                    Utils.getSplitMemoryAccessSpace(load_info.Item1 as NAryExpr).Select(i => i.Decl.Name).ToList() :
+                    new List<string> {"mem", "mem_bitmap", "mem_stack"};
                 Expr isAddrInBitmap = new NAryExpr(Token.NoToken, new FunctionCall(this.addrInBitmap), new List<Expr> { addr });
                 Expr isAddrInStack = new NAryExpr(Token.NoToken, new FunctionCall(this.addrInStack), new List<Expr> { addr });
 
