@@ -131,6 +131,7 @@ namespace CfiVerifier
             var delim = Options.IsLinux() ? @"/" : @"\";
             string binaryName = @"." + delim + "references" + delim + "Boogie.exe";
 			//string binaryName = @"../../../references/Boogie.exe";
+            Utils.Assert(File.Exists(binaryName), "Could not find provided Boogie executable!");
             //Func<string, string> ProcessOutput = delegate(string s) { return ("The number of lines in output = " + s.Split('\n').Count().ToString()); };
             Func<string, bool> result = delegate(string s)
             {
@@ -150,7 +151,6 @@ namespace CfiVerifier
                 Process proc = new Process();
                 proc.StartInfo = procInfo;
                 proc.EnableRaisingEvents = false;
-                Stopwatch sw = Stopwatch.StartNew();
                 proc.Start();
                 string output = "";
                 output = proc.StandardOutput.ReadToEnd();

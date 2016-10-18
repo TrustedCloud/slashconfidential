@@ -17,13 +17,14 @@ namespace CommandLineTools
             GRAPH,
             REMOVE_CODE_BRANCHES,
             SPLIT_MEMORY,
-            SPLIT_MEMORY_OPT,
-            SIMPLIFY_CONSTANT_EXPRS
+            SIMPLIFY_CONSTANT_EXPRS,
+            EXTRACT_LOADS
         }
 
         public static void Main(string[] args)
         {
             if (!CfiVerifier.Options.ParseCommandLine(String.Join(" ", args))) return;
+            Utils.Assert(args.Length == 3, "Expecting three given arguments (<passes> <inputFile> <outputFile>)!");
             // Arguments: string inputFile, string outputFile
             Program inputProgram;
             Utils.ParseProgram(args[1], out inputProgram);
@@ -52,6 +53,9 @@ namespace CommandLineTools
                       break;
                   case ProgramChoice.SIMPLIFY_CONSTANT_EXPRS:
                       CLConstantExpressionSimplifier.Run(inputProgram);
+                      break;
+                  case ProgramChoice.EXTRACT_LOADS:
+                      CLLoadExtractor.Run(inputProgram);
                       break;
                   default:
                       throw new Exception("Not implemented");

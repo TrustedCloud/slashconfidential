@@ -24,31 +24,12 @@ namespace CommandLineTools
             Options.splitFiles = true; // HACK
             Program prog;
             Utils.ParseString(sw.ToString(), out prog);
-            CodeProcess(prog);
             Dictionary<Tuple<string, Cmd, AssertCmd>, bool> loadAddressRegionDB = DecideAddressRegions(prog, false);
             Utils.ParseString(sw.ToString(), out prog);
-            CodeProcess(prog);
             Dictionary<Tuple<string, Cmd, AssertCmd>, bool> storeAddressRegionDB = DecideAddressRegions(prog, true);
-            Utils.ParseString(sw.ToString(), out prog);
             Options.splitMemoryModel = true;
             (new SplitMemoryModeler(storeAddressRegionDB, loadAddressRegionDB, Utils.ProgramIsSplit(input))).Visit(input);
             sw.Close();
-        }
-
-        private static void CodeProcess(Program prog) {
-            try
-            {
-                // SpecialInstructionLifter requires addresses for functions passed as arguments
-                //(new SpecialInstructionLifter()).Visit(prog);
-                (new ModularVerificationSetup()).Visit(prog);
-                (new EnvironmentSetup()).Visit(prog);
-                (new IndiscriminateAssumeSlicer()).Visit(prog);
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine("Exception: " + e);
-                Environment.Exit(1);
-            }
         }
 
         private static Dictionary<Tuple<string, Cmd, AssertCmd>, bool> DecideAddressRegions(Program prog, bool store)

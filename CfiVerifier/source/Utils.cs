@@ -237,7 +237,7 @@ namespace CfiVerifier
         }
 
         //input must be a load expression
-		public static Tuple<Expr,Expr> getLoadArgs(Expr e)
+        public static Tuple<Expr,Expr> getLoadArgs(Expr e)
         {
             Func<Expr, string, bool> RhsMatch = delegate(Expr x, String s)
             {
@@ -273,13 +273,38 @@ namespace CfiVerifier
                 ((NAryExpr)rhs).Args[2]);
         }
 
+        /* For an IfThenElse expression of the form:
+         *      > if addrInspace(addr) then mem_space else [..]
+         *
+         * Returns all memory spaces referenced in the expression and any nested
+         * IfThenElse expressions in the else branch. */
+        public static List<IdentifierExpr> getSplitMemoryAccessSpace(NAryExpr ite) {
+            Utils.Assert(ite.Fun is Microsoft.Boogie.IfThenElse);
+            List<IdentifierExpr> referencedMemSpaces = new List<IdentifierExpr> {ite.Args[1] as IdentifierExpr };
+            if (ite.Args[2] is IdentifierExpr && (ite.Args[2] as IdentifierExpr).Name.Equals("mem"))
+                referencedMemSpaces.Add(ite.Args[2] as IdentifierExpr);
+            else if (ite.Args[2] is NAryExpr && (ite.Args[2] as NAryExpr).Fun is Microsoft.Boogie.IfThenElse)
+                referencedMemSpaces.AddRange(getSplitMemoryAccessSpace(ite.Args[2] as NAryExpr));
+            return referencedMemSpaces;
+        }
+
+        /* For an AssignCmd of the form:
+         *      > mem := (if addrInSpace(addr) then STORE(mem, addr) else mem);
+         *
+         * Returns addr */
         public static Expr getSplitMemoryOperationAddress(AssignCmd c) {
             Utils.Assert(c.Lhss.Count == 1 && c.Rhss.Count == 1, "getSplitMemoryOperationAddress not handling parallel assignCmds");
             NAryExpr rhs = c.Rhss[0] as NAryExpr;
+            if (rhs == null)
+                return null;
             Utils.Assert(rhs.Fun.GetType().Equals(typeof(Microsoft.Boogie.IfThenElse)));
             return (rhs.Args[0] as NAryExpr).Args[0];
         }
 
+        /* For an AssignCmd of the form:
+         *      > mem := TODO
+         *
+         * Returns addr */
         public static Expr getSplitMemoryUpdateExpr(AssignCmd c) {
             Utils.Assert(c.Lhss.Count == 1 && c.Rhss.Count == 1, "getSplitMemoryUpdateExpr not handling parallel assignCmds");
             NAryExpr rhs = c.Rhss[0] as NAryExpr;
@@ -306,7 +331,7 @@ namespace CfiVerifier
         {
             if (e is IdentifierExpr)
             {
-                return new List<Variable>() { (e as IdentifierExpr).Decl };
+                return new List<Variable> { (e as IdentifierExpr).Decl };
             }
             else if (e is BvConcatExpr)
             {
@@ -470,10 +495,10 @@ namespace CfiVerifier
             return new Tuple<string, List<string>>(currentNode.Label, loopHeaderLabels);
         }
 
-		public static bool ProgramIsSplit(Program prog) {
-			Utils.Assert (prog.Implementations.Count() == 1, "Expected program with a single implementation!");
-			return prog.GlobalVariables.FirstOrDefault(i => i.Name.Equals("mem_bitmap")) != null
-				&& prog.GlobalVariables.FirstOrDefault(i => i.Name.Equals("mem_stack")) != null;
+        public static bool ProgramIsSplit(Program prog) {
+            Utils.Assert (prog.Implementations.Count() == 1, "Expected program with a single implementation!");
+            return prog.GlobalVariables.FirstOrDefault(i => i.Name.Equals("mem_bitmap")) != null
+                && prog.GlobalVariables.FirstOrDefault(i => i.Name.Equals("mem_stack")) != null;
         }
     }
 }

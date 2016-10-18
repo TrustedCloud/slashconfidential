@@ -8,6 +8,9 @@ using Microsoft.Basetypes;
 
 namespace CfiVerifier
 {
+    /* This simplifies arithmetic operations with constant expressions, e.g.:
+     *      > PLUS_64(1bv64, 7bv64) -> 8bv64
+     * */
     public class ConstantExpressionSimplifier : StandardVisitor
     {
         public override Expr VisitExpr(Expr node)

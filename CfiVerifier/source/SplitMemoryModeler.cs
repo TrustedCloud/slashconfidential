@@ -23,6 +23,7 @@ namespace CfiVerifier
         private GlobalVariable mem;
 
         private string current_label;
+        private bool splitProgram;
 
         public override Program VisitProgram(Program node)
         {
@@ -30,6 +31,7 @@ namespace CfiVerifier
             this.addrInStack = Utils.FindFunctionInProgram(node, "addrInStack");
 
             this.mem = Utils.FindGlobalVariableInProgram(node, "mem");
+            this.splitProgram = Utils.ProgramIsSplit(node);
 
             return base.VisitProgram(node);
         }
@@ -41,10 +43,10 @@ namespace CfiVerifier
             return base.VisitBlock(node);
         }
 
-        public List<Expr> getNestedLoadAddresses(Expr e)
+        public List<Tuple<Expr, Expr>> getNestedLoadAddresses(Expr e)
         {
             //if there is no load, no point in recursing
-            if (!(Utils.getNestedFunctions(e).Any(x => x.FunctionName.Contains("LOAD_LE")))) { return new List<Expr>(); }
+            if (!(Utils.getNestedFunctions(e).Any(x => x.FunctionName.Contains("LOAD_LE")))) { return new List<Tuple<Expr, Expr>>(); }
 
             //we have one or more load expressions here. so let's recursively find them and substitute.
             if (e is NAryExpr)
@@ -53,14 +55,14 @@ namespace CfiVerifier
                 if ((e as NAryExpr).Fun.FunctionName.Contains("LOAD_LE"))
                 {
                     Tuple<Expr, Expr> load_args = Utils.getLoadArgs(e);
-                    List<Expr> exprs = new List<Expr>() { load_args.Item2 };
+                    List<Tuple<Expr, Expr>> exprs = new List<Tuple<Expr, Expr>>() { new Tuple<Expr, Expr> (load_args.Item1, load_args.Item2 )};
                     exprs.AddRange(getNestedLoadAddresses(load_args.Item2));
                     return exprs;
                 }
                 else
                 {
                     //not a load expression, but we need to recurse
-                    List<Expr> exprs = new List<Expr>();
+                    List<Tuple<Expr, Expr>> exprs = new List<Tuple<Expr, Expr>>();
                     foreach (Expr arg in (e as NAryExpr).Args)
                     {
                         exprs.AddRange(getNestedLoadAddresses(arg));
@@ -74,13 +76,13 @@ namespace CfiVerifier
             }
             else if (e is BvConcatExpr)
             {
-                List<Expr> exprs = new List<Expr>();
+                List<Tuple<Expr, Expr>> exprs = new List<Tuple<Expr, Expr>>();
                 exprs.AddRange(getNestedLoadAddresses((e as BvConcatExpr).E0));
                 exprs.AddRange(getNestedLoadAddresses((e as BvConcatExpr).E1));
                 return exprs;
             }
-            else if (e is IdentifierExpr) { return new List<Expr>(); }
-            else if (e is LiteralExpr) { return new List<Expr>(); }
+            else if (e is IdentifierExpr) { return new List<Tuple<Expr, Expr>>(); }
+            else if (e is LiteralExpr) { return new List<Tuple<Expr, Expr>>(); }
             else { Utils.Assert(false, "Should not get here"); return null; }
         }
 
@@ -93,10 +95,10 @@ namespace CfiVerifier
                 {
                     AssignCmd ac = c as AssignCmd;
                     Utils.Assert(ac.Lhss.Count == 1 && ac.Rhss.Count == 1, "Not handling parallel AssignCmd");
-                    List<Expr> loadAddresses = getNestedLoadAddresses(ac.Rhss[0]);
+                    List<Tuple<Expr, Expr>> loadAddresses = getNestedLoadAddresses(ac.Rhss[0]);
                     Utils.Assert(loadAddresses.Select(x => x.ToString()).Distinct().Count() < 2,
                         "Found multiple load expressions in " + ac.Rhss[0].ToString());
-                    Expr load_addr = loadAddresses.Any() ? loadAddresses[0] : null;
+                    Tuple<Expr, Expr> load_addr = loadAddresses.Any() ? loadAddresses[0] : null;
 
                     if (load_addr != null)
                     {
@@ -108,19 +110,42 @@ namespace CfiVerifier
                             VCSplitter.Instance.RecordAssertion(this.current_label, ac, assertion, Utils.getSlashVerifyCmdType(ac));
                         };
 
-                        NAryExpr condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInBitmap), new List<Expr> { load_addr });
-                        RecordAssertion(condition, "addrInBitmap");
+                        Action RecordStackAssertions = delegate()
+                        {
+                            NAryExpr condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInStack), new List<Expr> { load_addr.Item2 });
+                            RecordAssertion(condition, "addrInStack");
 
-                        condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInStack), new List<Expr> { load_addr });
-                        RecordAssertion(condition, "addrInStack");
+                            condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInStack), new List<Expr> { load_addr.Item2 });
+                            condition = new NAryExpr(Token.NoToken, new UnaryOperator(Token.NoToken, UnaryOperator.Opcode.Not), new List<Expr> {condition});
+                            RecordAssertion(condition, "!addrInStack");
+                        };
 
-                        condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInBitmap), new List<Expr> { load_addr });
-                        condition = new NAryExpr(Token.NoToken, new UnaryOperator(Token.NoToken, UnaryOperator.Opcode.Not), new List<Expr> {condition});
-                        RecordAssertion(condition, "!addrInBitmap");
+                        Action RecordBitmapAssertions = delegate()
+                        {
+                            NAryExpr condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInBitmap), new List<Expr> { load_addr.Item2 });
+                            RecordAssertion(condition, "addrInBitmap");
 
-                        condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInStack), new List<Expr> { load_addr });
-                        condition = new NAryExpr(Token.NoToken, new UnaryOperator(Token.NoToken, UnaryOperator.Opcode.Not), new List<Expr> {condition});
-                        RecordAssertion(condition, "!addrInStack");
+                            condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInBitmap), new List<Expr> { load_addr.Item2 });
+                            condition = new NAryExpr(Token.NoToken, new UnaryOperator(Token.NoToken, UnaryOperator.Opcode.Not), new List<Expr> {condition});
+                            RecordAssertion(condition, "!addrInBitmap");
+                        };
+
+                        if (!this.splitProgram) {
+                            RecordStackAssertions();
+                            RecordBitmapAssertions();
+                        }
+                        else {
+                            if (load_addr.Item1 is NAryExpr) {
+                                List<IdentifierExpr> referencedMemSpaces = Utils.getSplitMemoryAccessSpace(load_addr.Item1 as NAryExpr);
+                                foreach (Variable memSpace in referencedMemSpaces.Select(i => i.Decl)) {
+                                    if (memSpace.Name.Equals("mem_bitmap"))
+                                        RecordBitmapAssertions();
+                                    else if (memSpace.Name.Equals("mem_stack"))
+                                        RecordStackAssertions();
+                                }
+
+                            }
+                        }
                     }
                 }
 
@@ -248,20 +273,24 @@ namespace CfiVerifier
                             {
                                 if (ac.Lhss.First().DeepAssignedVariable.Name.Equals("mem_stack")) {
                                     Expr address = Utils.getSplitMemoryOperationAddress(ac);
+                                    if (address == null)
+                                        break;
                                     NAryExpr condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInStack), new List<Expr> { address });
                                     RecordAssertion(condition, "addrInStack", ac);
 
                                     condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInStack), new List<Expr> { address });
-                                    condition = new NAryExpr(Token.NoToken, new UnaryOperator(Token.NoToken, UnaryOperator.Opcode.Not), new List<Expr> {condition});
+                                    condition = new NAryExpr(Token.NoToken, new UnaryOperator(Token.NoToken, UnaryOperator.Opcode.Not), new List<Expr> { condition });
                                     RecordAssertion(condition, "!addrInStack", ac);
                                 }
                                 else if (ac.Lhss.First().DeepAssignedVariable.Name.Equals("mem_bitmap")) {
                                     Expr address = Utils.getSplitMemoryOperationAddress(ac);
+                                    if (address == null)
+                                        break;
                                     NAryExpr condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInBitmap), new List<Expr> { address });
                                     RecordAssertion(condition, "addrInBitmap", ac);
 
                                     condition = new NAryExpr(Token.NoToken, new FunctionCall(addrInBitmap), new List<Expr> { address });
-                                    condition = new NAryExpr(Token.NoToken, new UnaryOperator(Token.NoToken, UnaryOperator.Opcode.Not), new List<Expr> {condition});
+                                    condition = new NAryExpr(Token.NoToken, new UnaryOperator(Token.NoToken, UnaryOperator.Opcode.Not), new List<Expr> { condition });
                                     RecordAssertion(condition, "!addrInBitmap", ac);
                                 }
                                 break;
@@ -382,35 +411,34 @@ namespace CfiVerifier
         private Expr splitMemoryOnAllLoads(Expr e, AddrType addrType, bool notBitmap, bool notStack)
         {
             //takes as input the addr expr of LOAD(mem,addr), and returns the desired expression for mem : ITE(addrInBitmap(.), mem_bitmap, ITE(..))
-            Func<Expr, Expr> getDesiredMemExpr = delegate(Expr addr)
+            Func<Tuple<Expr, Expr>, Expr> getDesiredMemExpr = delegate(Tuple<Expr, Expr> load_info)
             {
                 if (addrType == AddrType.StackAddress)
                 {
                     return new IdentifierExpr(Token.NoToken, this.mem_stack);
                 }
-                else if (addrType == AddrType.BitmapAddress)
+                if (addrType == AddrType.BitmapAddress)
                 {
                     return new IdentifierExpr(Token.NoToken, this.mem_bitmap);
                 }
-                else
+                Expr addr = load_info.Item2;
+                List<string> targetedMemSpacesNames = Utils.getSplitMemoryAccessSpace(load_info.Item1 as NAryExpr).Select(i => i.Decl.Name).ToList();
+                Expr isAddrInBitmap = new NAryExpr(Token.NoToken, new FunctionCall(this.addrInBitmap), new List<Expr> { addr });
+                Expr isAddrInStack = new NAryExpr(Token.NoToken, new FunctionCall(this.addrInStack), new List<Expr> { addr });
+
+                Expr tmp = new IdentifierExpr(Token.NoToken, mem);
+                if (!notBitmap && targetedMemSpacesNames.Contains("mem_bitmap")) //may target the bitmap
                 {
-                    Expr isAddrInBitmap = new NAryExpr(Token.NoToken, new FunctionCall(this.addrInBitmap), new List<Expr> { addr });
-                    Expr isAddrInStack = new NAryExpr(Token.NoToken, new FunctionCall(this.addrInStack), new List<Expr> { addr });
-
-                    Expr tmp = new IdentifierExpr(Token.NoToken, mem);
-                    if (!notBitmap) //may target the bitmap
-                    {
-                        tmp = new NAryExpr(Token.NoToken, new IfThenElse(Token.NoToken), new List<Expr> {
-                                            isAddrInBitmap, new IdentifierExpr(Token.NoToken, this.mem_bitmap), tmp});
-                    }
-
-                    if (!notStack) //may target the stack
-                    {
-                        tmp = new NAryExpr(Token.NoToken, new IfThenElse(Token.NoToken), new List<Expr> {
-                                            isAddrInStack, new IdentifierExpr(Token.NoToken, this.mem_stack), tmp});
-                    }
-                    return tmp;
+                    tmp = new NAryExpr(Token.NoToken, new IfThenElse(Token.NoToken), new List<Expr> {
+                                        isAddrInBitmap, new IdentifierExpr(Token.NoToken, this.mem_bitmap), tmp});
                 }
+
+                if (!notStack && targetedMemSpacesNames.Contains("mem_stack")) //may target the stack
+                {
+                    tmp = new NAryExpr(Token.NoToken, new IfThenElse(Token.NoToken), new List<Expr> {
+                                        isAddrInStack, new IdentifierExpr(Token.NoToken, this.mem_stack), tmp});
+                }
+                return tmp;
             };
 
             //if there is no load, no point in recursing
@@ -423,9 +451,11 @@ namespace CfiVerifier
                 if ((e as NAryExpr).Fun.FunctionName.Contains("LOAD_LE"))
                 {
                     Tuple<Expr, Expr> load_args = Utils.getLoadArgs(e);
-                    Expr desired_mem = getDesiredMemExpr(load_args.Item2);
+                    if (this.splitProgram && load_args.Item1 is IdentifierExpr)
+                        return e;
+                    Expr desired_mem = getDesiredMemExpr(load_args);
                     //even the address expression can have a load
-                    return new NAryExpr(Token.NoToken, (e as NAryExpr).Fun, new List<Expr>() { desired_mem, splitMemoryOnAllLoads(load_args.Item2, addrType, notBitmap, notStack) });
+                    return new NAryExpr(Token.NoToken, (e as NAryExpr).Fun, new List<Expr> { desired_mem, splitMemoryOnAllLoads(load_args.Item2, addrType, notBitmap, notStack) });
                 }
                 else
                 {
@@ -438,32 +468,29 @@ namespace CfiVerifier
                     return new NAryExpr(Token.NoToken, (e as NAryExpr).Fun, new_args);
                 }
             }
-            else if (e is BvExtractExpr)
+            if (e is BvExtractExpr)
             {
                 return new BvExtractExpr(Token.NoToken,
                     splitMemoryOnAllLoads((e as BvExtractExpr).Bitvector, addrType, notBitmap, notStack),
                     (e as BvExtractExpr).End,
                     (e as BvExtractExpr).Start);
             }
-            else if (e is BvConcatExpr)
+            if (e is BvConcatExpr)
             {
                 return new BvConcatExpr(Token.NoToken,
                     splitMemoryOnAllLoads((e as BvConcatExpr).E0, addrType, notBitmap, notStack),
                     splitMemoryOnAllLoads((e as BvConcatExpr).E1, addrType, notBitmap, notStack));
             }
-            else if (e is IdentifierExpr)
+            if (e is IdentifierExpr)
             {
                 return e; //cant
             }
-            else if (e is LiteralExpr)
+            if (e is LiteralExpr)
             {
                 return e;
             }
-            else
-            {
-                Utils.Assert(false, "Should not get here");
-                return null;
-            }
+            Utils.Assert(false, "Should not get here");
+            return null;
         }
 
         private Expr transformLoad(string label, Cmd c, Expr toTransform)
