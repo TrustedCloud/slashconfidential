@@ -114,6 +114,7 @@
     <Compile Include="source\CLSlicer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="source\CLLoadExtractor.cs" />
+    <Compile Include="source\CLVerifier.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

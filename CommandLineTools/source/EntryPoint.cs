@@ -18,7 +18,8 @@ namespace CommandLineTools
             REMOVE_CODE_BRANCHES,
             SPLIT_MEMORY,
             SIMPLIFY_CONSTANT_EXPRS,
-            EXTRACT_LOADS
+            EXTRACT_LOADS,
+            VERIFY
         }
 
         public static void Main(string[] args)
@@ -56,6 +57,9 @@ namespace CommandLineTools
                       break;
                   case ProgramChoice.EXTRACT_LOADS:
                       CLLoadExtractor.Run(inputProgram);
+                      break;
+                  case ProgramChoice.VERIFY:
+                      CLVerifier.Run(inputProgram);
                       break;
                   default:
                       throw new Exception("Not implemented");
