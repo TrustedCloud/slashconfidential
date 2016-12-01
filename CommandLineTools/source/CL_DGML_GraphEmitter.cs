@@ -10,7 +10,7 @@ using Microsoft.Boogie.GraphUtil;
 
 namespace CommandLineTools
 {
-    class CLGraphEmitter
+    class CL_DGML_GraphEmitter
     {
         enum MemoryOperation {
             STORE_BITMAP,

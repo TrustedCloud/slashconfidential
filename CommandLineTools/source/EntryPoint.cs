@@ -14,12 +14,15 @@ namespace CommandLineTools
         enum ProgramChoice {
             SLICE,
             SLICE_PARTITIONS,
-            GRAPH,
+            GRAPH_DOT,
+            GRAPH_DGML,
             REMOVE_CODE_BRANCHES,
             SPLIT_MEMORY,
             SIMPLIFY_CONSTANT_EXPRS,
             EXTRACT_LOADS,
-            VERIFY
+            VERIFY,
+            SLICE_ASSUMES,
+            ABSTRACT_MEM
         }
 
         public static void Main(string[] args)
@@ -35,13 +38,17 @@ namespace CommandLineTools
 
             foreach (string choiceString in args[0].Split(',')) {
                 ProgramChoice choice = (ProgramChoice)Enum.Parse(typeof(ProgramChoice), choiceString);
+                Console.WriteLine(choiceString);
                 switch (choice)
                 {
                   case ProgramChoice.SLICE:
                       CLSlicer.Run(inputProgram);
                       break;
-                  case ProgramChoice.GRAPH:
-                      CLGraphEmitter.Run(inputProgram, outputBasename.Split('.')[0]);
+                  case ProgramChoice.GRAPH_DGML:
+                      CL_DGML_GraphEmitter.Run(inputProgram, outputBasename.Split('.')[0]);
+                      break;
+                  case ProgramChoice.GRAPH_DOT:
+                      CL_DOT_GraphEmitter.Run(inputProgram, outputBasename.Split('.')[0]);
                       break;
                   case ProgramChoice.REMOVE_CODE_BRANCHES:
                       CLRemoveCodeBranches.Run(inputProgram);
@@ -60,6 +67,12 @@ namespace CommandLineTools
                       break;
                   case ProgramChoice.VERIFY:
                       CLVerifier.Run(inputProgram);
+                      break;
+                  case ProgramChoice.SLICE_ASSUMES:
+                      CLIndiscrimateAssumeSlicer.Run(inputProgram);
+                      break;
+                  case ProgramChoice.ABSTRACT_MEM:
+                      CLMemAbstractor.Run(inputProgram);
                       break;
                   default:
                       throw new Exception("Not implemented");

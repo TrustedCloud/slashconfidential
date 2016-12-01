@@ -74,6 +74,7 @@
     <Compile Include="source\Utils.cs" />
     <Compile Include="source\VCSplitter.cs" />
     <Compile Include="source\LoadExtractor.cs" />
+    <Compile Include="source\MemAbstractor.cs" />
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include=".NETFramework,Version=v4.0,Profile=Client">
