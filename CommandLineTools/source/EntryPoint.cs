@@ -9,21 +9,23 @@ using Microsoft.Boogie;
 
 namespace CommandLineTools
 {
+    public enum ProgramChoice {
+        SLICE,
+        SLICE_PARTITIONS,
+        GRAPH_DOT,
+        GRAPH_DGML,
+        REMOVE_CODE_BRANCHES,
+        SPLIT_MEMORY,
+        SIMPLIFY_CONSTANT_EXPRS,
+        EXTRACT_LOADS,
+        VERIFY,
+        SLICE_ASSUMES,
+        ABSTRACT_MEM,
+		ABSTRACT_USER_CALL_MEM
+    }
+
     class EntryPoint
     {
-        enum ProgramChoice {
-            SLICE,
-            SLICE_PARTITIONS,
-            GRAPH_DOT,
-            GRAPH_DGML,
-            REMOVE_CODE_BRANCHES,
-            SPLIT_MEMORY,
-            SIMPLIFY_CONSTANT_EXPRS,
-            EXTRACT_LOADS,
-            VERIFY,
-            SLICE_ASSUMES,
-            ABSTRACT_MEM
-        }
 
         public static void Main(string[] args)
         {
@@ -45,10 +47,10 @@ namespace CommandLineTools
                       CLSlicer.Run(inputProgram);
                       break;
                   case ProgramChoice.GRAPH_DGML:
-                      CL_DGML_GraphEmitter.Run(inputProgram, outputBasename.Split('.')[0]);
+                      CL_DGML_GraphEmitter.Run(inputProgram, outputName.Substring(0, outputName.LastIndexOf(".")));
                       break;
-                  case ProgramChoice.GRAPH_DOT:
-                      CL_DOT_GraphEmitter.Run(inputProgram, outputBasename.Split('.')[0]);
+                    case ProgramChoice.GRAPH_DOT:
+                      CL_DOT_GraphEmitter.Run(inputProgram, outputName.Substring(0, outputName.LastIndexOf(".")));
                       break;
                   case ProgramChoice.REMOVE_CODE_BRANCHES:
                       CLRemoveCodeBranches.Run(inputProgram);
@@ -74,13 +76,18 @@ namespace CommandLineTools
                   case ProgramChoice.ABSTRACT_MEM:
                       CLMemAbstractor.Run(inputProgram);
                       break;
+				  case ProgramChoice.ABSTRACT_USER_CALL_MEM:
+				      CLUserDefinedCallMemAbstractor.Run(inputProgram);
+					  break;
                   default:
                       throw new Exception("Not implemented");
               }
             }
-        TokenTextWriter ttw = new TokenTextWriter(outputName);
-        inputProgram.Emit(ttw);
-        ttw.Close();
+            if (!(args[0].Equals("GRAPH_DOT") || args[0].Equals("GRAPH_DGML") || args[0].Equals("VERIFY"))) {
+                TokenTextWriter ttw = new TokenTextWriter(outputName);
+                inputProgram.Emit(ttw);
+                ttw.Close();
+            }
         }
     }
 }

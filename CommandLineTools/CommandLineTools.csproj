@@ -37,7 +37,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <ConsolePause>false</ConsolePause>
-    <Commandlineparameters>SPLIT_MEMORY ../../../d1.bpl ../../../d1_proc.out</Commandlineparameters>
+    <Commandlineparameters>GRAPH_DOT ../../../d1.bpl ../../../d1_proc.out</Commandlineparameters>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -118,6 +118,7 @@
     <Compile Include="source\CLMemAbstractor.cs" />
     <Compile Include="source\CL_DGML_GraphEmitter.cs" />
     <Compile Include="source\CL_DOT_GraphEmitter.cs" />
+    <Compile Include="source\CLUserDefinedCallMemAbstractor.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
