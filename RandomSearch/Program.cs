@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Diagnostics;
+using System.IO;
 
 namespace RandomSearch
 {
@@ -11,10 +12,11 @@ namespace RandomSearch
 	{
 		private const int maxChoiceCount = 15;
 		private const int minChoiceCount = 5;
-		private const int runCount = 5;
+		private const int runCount = 500;
 		private const String outputTmpName = "out.tmp";
 
 		private static String binaryPath = "/home/sentenced/Documents/slashconf/slashconfidential/CommandLineTools/bin/Debug/CommandLineTools.exe";
+		private static String outputFolder = "./RandomSearchOutput/";
 
 
 		private static List<CommandLineTools.ProgramChoice> duplicateChoices = 
@@ -33,11 +35,29 @@ namespace RandomSearch
 
 		public static void Main(string[] args) {
 			if (args.Length != 1) {
-				System.Console.WriteLine("Required argument: input Boogie file.");
+				System.Console.WriteLine("Required argument: input Boogie file or folder with containing files.");
 				return;
 			}
-			String inputFile = args[0];
+			if (Directory.Exists(outputFolder)) {
+				Directory.Delete(outputFolder, true);
+			}
+			Directory.CreateDirectory(outputFolder);
+			if (!(File.Exists(args[0]) || Directory.Exists(args[0]))) {
+				System.Console.WriteLine("Given path does not exist!");
+				return;
+			}
 			Random randomChoice = new Random(42);
+			if (Directory.Exists(args[0])) {
+				foreach (string file in 
+						Directory.EnumerateFiles(args[0]).Where(i => i.ToLower().Contains(".bpl"))) {
+					RunOnce(file, randomChoice);
+				}
+			}
+			else 
+				RunOnce(args[0], randomChoice);
+		}
+
+		public static void RunOnce(string inputFile, Random randomChoice) {
 			/* Choice string, verified, time taken (s) */
 			List<Tuple<string, bool, int>> results = new List<Tuple<string, bool, int>>();
 			Stopwatch sw = new Stopwatch();
@@ -58,6 +78,10 @@ namespace RandomSearch
 				results.Add(new Tuple<string, bool, int>(choiceString, 
 					boogieVerifyOutput.Contains("1 verified"),
 					(int) (sw.ElapsedMilliseconds / 1000)));
+				if (boogieVerifyOutput.Contains("1 verified")) {
+					File.Copy(inputFile, outputFolder + inputFile.Split('/').Last().Split('.').First() + "_" + i + ".bpl");
+				}
+					
 			}
 			foreach (Tuple<string, bool, int> entry in results) {
 				System.Console.WriteLine("Choice string: " + entry.Item1);
@@ -66,6 +90,7 @@ namespace RandomSearch
 				System.Console.WriteLine("------------------------------");
 			}
 		}
+			
 
 
 		public static String GetChoices(Random randomChoice)
