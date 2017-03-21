@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="UTF-8" ?>
+<RandomSearch>	
+	<Constants>
+		<MaxChoiceCount>15</MaxChoiceCount>
+		<MinChoiceCount>5</MinChoiceCount>
+		<RunCount>100</RunCount>
+	</Constants>
+	<Paths>
+		<BinaryPath>/home/sentenced/Documents/slashconf/slashconfidential/CommandLineTools/bin/Debug/CommandLineTools.exe</BinaryPath>
+		<OutputFolder>./RandomSearchOutput</OutputFolder>
+		<OutputTempName>out.tmp</OutputTempName>
+	</Paths>
+</RandomSearch>

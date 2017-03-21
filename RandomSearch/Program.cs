@@ -5,9 +5,42 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Diagnostics;
 using System.IO;
+using System.Xml;
 
 namespace RandomSearch
 {
+	class SearchConfig {
+		private int maxChoiceCount {get; set;}
+		private int minChoiceCount {get; set;}
+		private int runCount {get; set;}
+		private string helperBinaryPath {get; set;}
+
+		private string outputFolder {get; set;}
+		private string outputTempName {get; set;}
+
+		public SearchConfig(int maxCC, int minCC, int rC, string hBP, string oF, string oTN) {
+			this.maxChoiceCount = maxCC;
+			this.minChoiceCount = minCC;
+			this.runCount = rC;
+			this.helperBinaryPath = hBP;
+			this.outputFolder = oF;
+			this.outputTempName = oTN;
+		}
+
+		public SearchConfig(string XMLConfigPath) {
+			XmlDocument config = new XmlDocument();
+			config.Load(XMLConfigPath);
+			XmlNode constantsRootNode = config.SelectSingleNode("/RandomSearch/Constants");
+			XmlNode pathsRootNode = config.SelectSingleNode("/RandomSearch/Paths");
+
+			this.maxChoiceCount = Int32.Parse(constantsRootNode.Attributes["MaxChoiceCount"].InnerText);
+			this.minChoiceCount = Int32.Parse(constantsRootNode.Attributes["MinChoiceCount"].InnerText);
+			this.runCount = Int32.Parse(constantsRootNode.Attributes["RunCount"].InnerText);
+			this.outputFolder = pathsRootNode.Attributes["outputFolder"].InnerText;
+			this.outputTempName = pathsRootNode.Attributes["outputTempName"].InnerText;
+		}
+	}
+
 	class ExecuteSearch
 	{
 		private const int maxChoiceCount = 15;
@@ -62,6 +95,7 @@ namespace RandomSearch
 			List<Tuple<string, bool, int>> results = new List<Tuple<string, bool, int>>();
 			Stopwatch sw = new Stopwatch();
 			for (int i = 0; i < runCount; i++) {
+				System.Console.WriteLine("*** Run count " + i);
 				Process runInstance = new Process();
 				String choiceString = GetChoices(randomChoice);
 				runInstance.StartInfo.UseShellExecute = false;
