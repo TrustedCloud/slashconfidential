@@ -39,7 +39,11 @@ namespace CommandLineTools
             string outputBasename = Path.GetFileName(args[2]);
 
             foreach (string choiceString in args[0].Split(',')) {
-                ProgramChoice choice = (ProgramChoice)Enum.Parse(typeof(ProgramChoice), choiceString);
+                ProgramChoice choice;
+                if (choiceString.Contains("VERIFY"))
+                    choice = ProgramChoice.VERIFY;
+                else
+                    choice = (ProgramChoice)Enum.Parse(typeof(ProgramChoice), choiceString);
                 Console.WriteLine(choiceString);
                 switch (choice)
                 {
@@ -68,7 +72,10 @@ namespace CommandLineTools
                       CLLoadExtractor.Run(inputProgram);
                       break;
                   case ProgramChoice.VERIFY:
-                      CLVerifier.Run(inputProgram);
+                      int timeout = 600;
+                      if (choiceString.Contains("_"))
+                        timeout = Int32.Parse(choiceString.Split('_')[1]);
+                      CLVerifier.Run(inputProgram, timeout);
                       break;
                   case ProgramChoice.SLICE_ASSUMES:
                       CLIndiscrimateAssumeSlicer.Run(inputProgram);

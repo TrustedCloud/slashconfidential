@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="UTF-8" ?>
-<RandomSearch>	
+<RandomSearch>
 	<Constants>
 		<MaxChoiceCount>15</MaxChoiceCount>
 		<MinChoiceCount>5</MinChoiceCount>

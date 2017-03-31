@@ -14,7 +14,7 @@ namespace CommandLineTools
 {
     static class CLVerifier
     {
-        public static void Run(Program input)
+        public static void Run(Program input, int timeout)
         {
             string tempFilename = @".temp.bpl";
             TokenTextWriter ttw = new TokenTextWriter(tempFilename);
@@ -23,8 +23,8 @@ namespace CommandLineTools
 
             char delim = Options.IsLinux() ? '/' : '\\';
             string binaryName = @"." + delim + "references" + delim + "Boogie.exe";
-            string z3Path = @"." + delim + "references" + delim + "z3.4.4.1.exe";
-            string arguments = "/z3exe:" + z3Path + @" /contractInfer /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0 /timeLimit:300 /errorLimit:1 " + tempFilename;
+            string z3Path = @"." + delim + "references" + delim + "z3.4.4.0.exe";
+            string arguments = "/z3exe:" + z3Path + @" /contractInfer /z3opt:smt.RELEVANCY=0 /z3opt:smt.CASE_SPLIT=0 /timeLimit:" + timeout + " /errorLimit:1 " + tempFilename;
             Utils.Assert(File.Exists(binaryName), "Could not find provided Boogie executable!");
 
             //Console.WriteLine("\tSTART Executing {0} {1}", binaryName, arguments);
@@ -46,7 +46,7 @@ namespace CommandLineTools
                 output = proc.StandardOutput.ReadToEnd();
                 proc.WaitForExit();
                 sw.Stop();
-                //Console.WriteLine("\tEND Executing {0} {1}", binaryName, arguments);
+                Console.WriteLine("\tEND Executing {0} {1}", binaryName, arguments);
                 Console.WriteLine("======================");
                 Console.WriteLine(output);
                 Console.WriteLine("Time taken: " + sw.ElapsedMilliseconds / 1000 + "s");
