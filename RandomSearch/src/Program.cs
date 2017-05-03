@@ -16,14 +16,16 @@ namespace RandomSearch
         public int runCount {get; set;}
         public string helperBinaryPath {get; set;}
 
+        public string logFile {get; set;}
         public string outputFolder {get; set;}
         public string outputTempName {get; set;}
 
-        public SearchConfig(int maxCC, int minCC, int rC, string hBP, string oF, string oTN) {
+        public SearchConfig(int maxCC, int minCC, int rC, string hBP, string oF, string oTN, string lF) {
             this.maxChoiceCount = maxCC;
             this.minChoiceCount = minCC;
             this.runCount = rC;
             this.helperBinaryPath = hBP;
+            this.logFile = lF;
             this.outputFolder = oF;
             this.outputTempName = oTN;
         }
@@ -37,6 +39,7 @@ namespace RandomSearch
             this.maxChoiceCount = Int32.Parse(constantsRootNode.SelectSingleNode("MaxChoiceCount").InnerText);
             this.minChoiceCount = Int32.Parse(constantsRootNode.SelectSingleNode("MinChoiceCount").InnerText);
             this.runCount = Int32.Parse(constantsRootNode.SelectSingleNode("RunCount").InnerText);
+            this.logFile = pathsRootNode.SelectSingleNode("LogFile").InnerText;
             this.outputFolder = pathsRootNode.SelectSingleNode("OutputFolder").InnerText;
             this.outputTempName = pathsRootNode.SelectSingleNode("OutputTempName").InnerText;
             this.helperBinaryPath = pathsRootNode.SelectSingleNode("BinaryPath").InnerText;
@@ -77,22 +80,28 @@ namespace RandomSearch
                 System.Console.WriteLine("Given path does not exist!");
                 return;
             }
+            System.IO.StreamWriter logWriter = new System.IO.StreamWriter(config.logFile);
+
             Random randomChoice = new Random(42);
             if (Directory.Exists(args[0])) {
                 foreach (string file in
                     Directory.EnumerateFiles(args[0]).Where(i => i.ToLower().Contains(".bpl"))) {
+                    logWriter.writeLine("== Current file: " + file);
                     TreeNode startNode = new TreeNode(ProgramChoice.SIMPLIFY_CONSTANT_EXPRS);
                     TreeNode startNodeChild = startNode.CreateChild(ProgramChoice.SLICE);
                     startNodeChild.SetTreeChild(Tree.CreateRandomTree(randomChoice, 3, 3));
-                    new Tree(startNode).VerifyTree(file, 500);
+                    foreach (string sequence in new Tree(startNode).VerifyTree(file, 500))
+                        logWriter.WriteLine(sequence);
                 }
             }
             else {
+                logWriter.writeLine("== Current file: " + file);
                 TreeNode startNode = new TreeNode(ProgramChoice.SIMPLIFY_CONSTANT_EXPRS);
                 TreeNode startNodeChild = startNode.CreateChild(ProgramChoice.SLICE);
                 startNodeChild.SetTreeChild(Tree.CreateRandomTree(randomChoice, 3, 3));
                 new Tree(startNode).PruneTree(args[0]);
-                new Tree(startNode).VerifyTree(args[0], 500);
+                foreach (string sequence in new Tree(startNode).VerifyTree(args[0], 500))
+                    logWriter.WriteLine(sequence);
             }
         }
 
