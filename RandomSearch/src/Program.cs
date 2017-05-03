@@ -50,22 +50,6 @@ namespace RandomSearch
     {
         private static SearchConfig config = new SearchConfig("/home/sentenced/Documents/slashconf/slashconfidential/RandomSearch/SlashConfRandomSearchConfig.xml");
 
-        private static List<CommandLineTools.ProgramChoice> duplicateChoices =
-            new List<CommandLineTools.ProgramChoice> {
-                CommandLineTools.ProgramChoice.SLICE,
-                CommandLineTools.ProgramChoice.SPLIT_MEMORY,
-        };
-
-        private static List<CommandLineTools.ProgramChoice> forbiddenChoices =
-            new List<CommandLineTools.ProgramChoice> {
-                CommandLineTools.ProgramChoice.VERIFY,
-                CommandLineTools.ProgramChoice.GRAPH_DOT,
-                CommandLineTools.ProgramChoice.GRAPH_DGML,
-                CommandLineTools.ProgramChoice.EXTRACT_LOADS
-        };
-
-
-
         public static void Main(string[] args) {
             if (args.Length != 1) {
                 System.Console.WriteLine("Required argument: input Boogie file or folder with containing files.");
@@ -80,30 +64,31 @@ namespace RandomSearch
                 System.Console.WriteLine("Given path does not exist!");
                 return;
             }
-            System.IO.StreamWriter logWriter = new System.IO.StreamWriter(config.logFile);
 
             Random randomChoice = new Random(42);
             if (Directory.Exists(args[0])) {
                 foreach (string file in
                     Directory.EnumerateFiles(args[0]).Where(i => i.ToLower().Contains(".bpl"))) {
-                    logWriter.writeLine("== Current file: " + file);
-                    TreeNode startNode = new TreeNode(ProgramChoice.SIMPLIFY_CONSTANT_EXPRS);
-                    TreeNode startNodeChild = startNode.CreateChild(ProgramChoice.SLICE);
-                    startNodeChild.SetTreeChild(Tree.CreateRandomTree(randomChoice, 3, 3));
-                    foreach (string sequence in new Tree(startNode).VerifyTree(file, 500))
-                        logWriter.WriteLine(sequence);
+                    PerformTreeSearch(randomChoice, file);
                 }
             }
             else {
-                logWriter.writeLine("== Current file: " + file);
-                TreeNode startNode = new TreeNode(ProgramChoice.SIMPLIFY_CONSTANT_EXPRS);
-                TreeNode startNodeChild = startNode.CreateChild(ProgramChoice.SLICE);
-                startNodeChild.SetTreeChild(Tree.CreateRandomTree(randomChoice, 3, 3));
-                new Tree(startNode).PruneTree(args[0]);
-                foreach (string sequence in new Tree(startNode).VerifyTree(args[0], 500))
+                PerformTreeSearch(randomChoice, args[0]);
+            }
+        }
+
+        private static void PerformTreeSearch(Random randomChoice, string inputFile) {
+            TreeNode startNode = new TreeNode(ProgramChoice.SIMPLIFY_CONSTANT_EXPRS);
+            TreeNode startNodeChild = startNode.CreateChild(ProgramChoice.SLICE);
+            startNodeChild.SetTreeChild(Tree.CreateRandomTree(randomChoice, 3, 3));
+            new Tree(startNode).PruneTree(inputFile);
+            using (StreamWriter logWriter = new StreamWriter(config.logFile)) {
+                logWriter.WriteLine("== Current file: " + inputFile);
+                foreach (string sequence in new Tree(startNode).VerifyTree(inputFile, 500, 3))
                     logWriter.WriteLine(sequence);
             }
         }
+
 
         public static void RunOnce(string inputFile, Random randomChoice) {
             /* Choice string, verified, time taken (s) */
@@ -164,32 +149,8 @@ namespace RandomSearch
             return BoogieResult.ERROR;
         }
 
-        public static String GetChoices(Random randomChoice)
-        {
-            int choiceCount = 0;
-            CommandLineTools.ProgramChoice currChoice;
-            String choiceString = "";
-            List<CommandLineTools.ProgramChoice> choiceValues =
-                Enum.GetValues(typeof(CommandLineTools.ProgramChoice))
-                    .Cast<CommandLineTools.ProgramChoice>()
-                    .ToList();
-            choiceValues = choiceValues.Except(forbiddenChoices).ToList();
-            while (choiceCount <= config.maxChoiceCount)
-            {
-                currChoice = choiceValues.ElementAt(randomChoice.Next(choiceValues.Count));
-                if (!duplicateChoices.Contains(currChoice))
-                    choiceValues.Remove(currChoice);
-                choiceString += currChoice.ToString() + ",";
-                if (choiceCount > config.minChoiceCount && randomChoice.Next(config.maxChoiceCount) < choiceCount)
-                    break;
-                choiceCount++;
-            }
-            choiceString += "GRAPH_DOT,VERIFY";
-            return choiceString;
-        }
-
         // TODO: Make this general, taking a list of passes and how many insertions;
-        private static string InsertSplitMemory(string sequence, int maxCount) {
+        public static string InsertSplitMemory(string sequence, int maxCount) {
             Random randomInsert = new Random();
             List<string> splitSequence = sequence.Split(',').ToList();
             for (int i = 0; i < maxCount; i++) {
@@ -200,4 +161,4 @@ namespace RandomSearch
             return String.Join(",", splitSequence);
         }
     }
-}
+
