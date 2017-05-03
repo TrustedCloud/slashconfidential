@@ -36,8 +36,9 @@
     <ConsolePause>false</ConsolePause>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(RunConfiguration)' == 'Custom Command' ">
-    <StartAction>Program</StartAction>
+    <StartAction>Project</StartAction>
     <StartProgram>..\temp\split_210.baseline.bpl</StartProgram>
+    <StartArguments>../../..//temp/split_210.baseline.bpl</StartArguments>
     <ConsolePause>false</ConsolePause>
   </PropertyGroup>
   <ItemGroup>
@@ -46,9 +47,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Program.cs" />
-    <Compile Include="Tree.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="src\Program.cs" />
+    <Compile Include="src\Tree.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <ItemGroup>
@@ -56,6 +57,9 @@
       <Project>{DD8FFBA5-037C-4C5E-8980-87ED21B818C1}</Project>
       <Name>CommandLineTools</Name>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="src\" />
   </ItemGroup>
   <ProjectExtensions>
     <MonoDevelop>

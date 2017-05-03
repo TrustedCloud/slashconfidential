@@ -1,6 +1,5 @@
 ﻿using System;
 using CommandLineTools;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Diagnostics;
@@ -9,6 +8,8 @@ using System.Xml;
 
 namespace RandomSearch
 {
+    public enum BoogieResult { VERIFIED, ERROR, TIMEOUT };
+
     class SearchConfig {
         public int maxChoiceCount {get; set;}
         public int minChoiceCount {get; set;}
@@ -60,6 +61,8 @@ namespace RandomSearch
                 CommandLineTools.ProgramChoice.EXTRACT_LOADS
         };
 
+
+
         public static void Main(string[] args) {
             if (args.Length != 1) {
                 System.Console.WriteLine("Required argument: input Boogie file or folder with containing files.");
@@ -78,23 +81,18 @@ namespace RandomSearch
             if (Directory.Exists(args[0])) {
                 foreach (string file in
                     Directory.EnumerateFiles(args[0]).Where(i => i.ToLower().Contains(".bpl"))) {
-                    TreeNode startNode = new TreeNode(ProgramChoice.SIMPLIFY_CONSTANT_EXPRS, file);
+                    TreeNode startNode = new TreeNode(ProgramChoice.SIMPLIFY_CONSTANT_EXPRS);
                     TreeNode startNodeChild = startNode.CreateChild(ProgramChoice.SLICE);
-                    startNodeChild.SetTreeChild(Tree.CreateRandomTree(randomChoice, 3));
-                    foreach (string sequence in new Tree(startNode).GetAllSequences()) {
-                        VerifySequence(InsertSplitMemory(sequence, 3), file, 600);
-                    }
-                    //RunOnce(file, randomChoice);
+                    startNodeChild.SetTreeChild(Tree.CreateRandomTree(randomChoice, 3, 3));
+                    new Tree(startNode).VerifyTree(file, 500);
                 }
             }
             else {
-                TreeNode startNode = new TreeNode(ProgramChoice.SIMPLIFY_CONSTANT_EXPRS, args[0]);
+                TreeNode startNode = new TreeNode(ProgramChoice.SIMPLIFY_CONSTANT_EXPRS);
                 TreeNode startNodeChild = startNode.CreateChild(ProgramChoice.SLICE);
-				Tree.CreateRandomTree(randomChoice, 3, null, 0, startNodeChild);
-                foreach (string sequence in new Tree(startNode).GetAllSequences()) {
-                    VerifySequence(InsertSplitMemory(sequence, 3), args[0], 600);
-                }
-                //RunOnce(args[0], randomChoice);
+                startNodeChild.SetTreeChild(Tree.CreateRandomTree(randomChoice, 3, 3));
+                new Tree(startNode).PruneTree(args[0]);
+                new Tree(startNode).VerifyTree(args[0], 500);
             }
         }
 
@@ -133,7 +131,7 @@ namespace RandomSearch
             }
         }
 
-        public static bool VerifySequence(string sequence, string inputFile, int timeout) {
+        public static BoogieResult VerifySequence(string sequence, string inputFile, int timeout) {
             Debug.Assert(!sequence.Contains("VERIFY"));
             sequence += ",VERIFY_" + timeout;
             Console.WriteLine("***** Verifying random sequence: " + sequence + "; timeout = " + timeout + "s");
@@ -147,7 +145,14 @@ namespace RandomSearch
             verifyInstance.WaitForExit();
             string boogieVerifyOutput = verifyInstance.StandardOutput.ReadToEnd();
             System.Console.WriteLine(boogieVerifyOutput);
-            return !boogieVerifyOutput.Contains("1 error");
+            if (boogieVerifyOutput.Contains("1 verified"))
+                return BoogieResult.VERIFIED;
+            if (boogieVerifyOutput.Contains("1 error"))
+                return BoogieResult.ERROR;
+            if (boogieVerifyOutput.Contains("1 time out"))
+                return BoogieResult.TIMEOUT;
+            Debug.Assert (false);
+            return BoogieResult.ERROR;
         }
 
         public static String GetChoices(Random randomChoice)
