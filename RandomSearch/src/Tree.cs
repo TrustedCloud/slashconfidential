@@ -106,15 +106,16 @@ namespace RandomSearch
             }
         }
 
-        public List<string> VerifyTree(string inputFile, int maxCount = -1, int memSplitCount = 0) {
+        public List<string> VerifyTree(string inputFile, Random randomChoice, int maxCount = -1, int memSplitCount = 0) {
             List<string> verifiedSequences = new List<string>();
+            List<string> toVerify = this.GetAllSequences();
             int count = 0;
-            foreach (string sequence in this.GetAllSequences()) {
-                if (count++ > maxCount)
-                    break;
+            while (toVerify.Any() && count++ < maxCount) {
+                string sequence = toVerify.ElementAt(randomChoice.Next(toVerify.Count));
                 string splitMemSeq = ExecuteSearch.InsertSplitMemory(sequence, memSplitCount);
                 if (ExecuteSearch.VerifySequence(splitMemSeq, inputFile, 600).Equals(BoogieResult.VERIFIED))
                     verifiedSequences.Add(splitMemSeq);
+                toVerify.Remove(sequence);
             }
             return verifiedSequences;
         }
