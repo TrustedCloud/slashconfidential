@@ -106,6 +106,55 @@ namespace RandomSearch
             }
         }
 
+        public List<string> VerifyAndPruneTree(string inputFile, Random randomChoice, int maxCount = -1, int memSplitCount = 0) {
+            List<string> verifiedSequences = new List<string>();
+            List<string> toVerify = this.GetAllSequences();
+            List<string> invalidSubseqs = new List<string>();
+            int count = 0;
+            while (toVerify.Any() && count++ < maxCount) {
+                string sequence = toVerify.ElementAt(randomChoice.Next(toVerify.Count));
+                string splitMemSeq = ExecuteSearch.InsertSplitMemory(sequence, memSplitCount);
+                if (invalidSubseqs.Where(i => sequence.StartsWith(i)).Any()) {
+                    Console.WriteLine("Found invalid subsequence in given sequence {0}.", sequence);
+                    continue;
+                }
+                BoogieResult sequenceResult = ExecuteSearch.VerifySequence(splitMemSeq, inputFile, 600);
+                if (sequenceResult.Equals(BoogieResult.VERIFIED))
+                    verifiedSequences.Add(splitMemSeq);
+                else if (sequenceResult.Equals(BoogieResult.ERROR)) {
+                    Console.WriteLine ("::: Found ERROR sequence - {0}", sequence);
+                    string subseq = GetInvalidSubseq(sequence, inputFile);
+                    if (subseq != null) {
+                        Console.WriteLine ("::: Adding invalid subsequence - {0}", subseq);
+                        invalidSubseqs.Add (subseq);
+                    }
+                }
+                toVerify.Remove(sequence);
+            }
+            return verifiedSequences;
+        }
+
+        private string GetInvalidSubseq(string sequence, string inputFile) {
+            List<string> splitSeq = sequence.Split(',').ToList();
+            int splitIndex = splitSeq.Count;
+            int maxSplitCount = (int) Math.Ceiling(Math.Log (splitIndex, 2));
+            int lastInvalidSubseqIndex = splitSeq.Count;
+            int splitCount = 0;
+            while (splitCount <= maxSplitCount) {
+                Console.WriteLine (":::: Attempting invalid check for split {0} - {1}", splitCount, String.Join(",", splitSeq.Take(splitIndex)));
+                splitCount++;
+                if (ExecuteSearch.VerifySequence(String.Join(",", splitSeq.Take(splitIndex)), inputFile, 30).Equals(BoogieResult.ERROR)) {
+                    lastInvalidSubseqIndex = splitIndex;
+                    splitIndex -= splitSeq.Count / (2 * splitCount);
+                }
+                else if (splitIndex != splitSeq.Count)
+                    splitIndex += splitSeq.Count / (2 * splitCount);
+                else
+                    break;
+            }
+            return String.Join(",", splitSeq.Take (lastInvalidSubseqIndex));
+        }
+
         public List<string> VerifyTree(string inputFile, Random randomChoice, int maxCount = -1, int memSplitCount = 0) {
             List<string> verifiedSequences = new List<string>();
             List<string> toVerify = this.GetAllSequences();
